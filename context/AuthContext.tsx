@@ -4,7 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 type AuthData = {
   name?: string;
   id?: string;
-  // We can add more fields like tokens or cookies here if needed
+  username?: string;
+  password?: string;
 };
 
 type AuthContextType = {
@@ -62,6 +63,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       '@scraped_data',
       '@timetable_data',
       '@results_json',
+      '@credentials'
     ]);
   };
 

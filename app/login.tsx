@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../context/ThemeContext';
 import { WebView } from 'react-native-webview';
 import { useAuth } from '../context/AuthContext';
@@ -32,15 +33,71 @@ export default function LoginScreen() {
   `;
 
   const injectedJavaScript = `
+    (function() {
+      // Monitor login button clicks to capture credentials
+      var btn = document.getElementById('btnLogin');
+      if (btn) {
+        btn.addEventListener('click', function() {
+          var u = document.getElementById('txtUserName') ? document.getElementById('txtUserName').value : '';
+          var p = document.getElementById('txtPassword') ? document.getElementById('txtPassword').value : '';
+          if (u && p) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'SAVE_CREDENTIALS', u: u, p: p }));
+          }
+        });
+      }
+
+      // Check for presence of fields and notify app
+      var poll = setInterval(function() {
+        if (document.getElementById('txtUserName')) {
+          clearInterval(poll);
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'READY_TO_FILL' }));
+        }
+      }, 500);
+    })();
     true;
   `;
 
+  const [savedCreds, setSavedCreds] = useState<any>(null);
+
+  React.useEffect(() => {
+    const loadCreds = async () => {
+      const stored = await AsyncStorage.getItem('@credentials');
+      if (stored) setSavedCreds(JSON.parse(stored));
+    };
+    loadCreds();
+  }, []);
+
   const handleNavigationStateChange = (navState: any) => {
     if (navState.url.toLowerCase().includes('dashboard') || navState.url.toLowerCase().includes('home')) {
-        login({ name: 'Student', id: '12405540' }).then(() => {
+        login({ name: 'Student', username: savedCreds?.u, password: savedCreds?.p }).then(() => {
             router.replace('/(tabs)');
         });
     }
+  };
+
+  const onMessage = (event: any) => {
+    try {
+      const msg = JSON.parse(event.nativeEvent.data);
+      if (msg.type === 'SAVE_CREDENTIALS') {
+        setSavedCreds(msg);
+        AsyncStorage.setItem('@credentials', JSON.stringify(msg)).catch(console.error);
+      } else if (msg.type === 'READY_TO_FILL') {
+        if (savedCreds) {
+          webViewRef.current?.injectJavaScript(`
+            (function() {
+              var u = document.getElementById('txtUserName');
+              var p = document.getElementById('txtPassword');
+              if (u) u.value = '${savedCreds.u}';
+              if (p) p.value = '${savedCreds.p}';
+              // Trigger any focus events needed by the site
+              u?.dispatchEvent(new Event('change', { bubbles: true }));
+              p?.dispatchEvent(new Event('change', { bubbles: true }));
+            })();
+            true;
+          `);
+        }
+      }
+    } catch (e) {}
   };
 
   const spoofedUserAgent = "Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36";
@@ -65,6 +122,7 @@ export default function LoginScreen() {
         injectedJavaScriptBeforeContentLoaded={injectedJavaScriptBeforeContentLoaded}
         injectedJavaScript={injectedJavaScript}
         onNavigationStateChange={handleNavigationStateChange}
+        onMessage={onMessage}
         onError={() => setError(true)}
         onHttpError={() => setError(true)}
         javaScriptEnabled={true}

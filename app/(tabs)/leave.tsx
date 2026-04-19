@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Platform, SafeAreaView, ActivityIndicator } from 'react-native';
-import { RefreshCcw } from 'lucide-react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Platform, SafeAreaView, ActivityIndicator, Dimensions } from 'react-native';
+import { RefreshCcw, CalendarCheck, FileText, Send } from 'lucide-react-native';
 import { WebView } from 'react-native-webview';
 import { useTheme } from '../../context/ThemeContext';
+
+const { width } = Dimensions.get('window');
 
 type TabType = 'APPLY' | 'SLIP';
 
@@ -32,24 +34,35 @@ export default function LeaveScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.text }]}>Leave Manager</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Hero Header */}
+      <View style={[styles.heroHeader, { backgroundColor: colors.card }]}>
+        <View style={styles.heroContent}>
+          <View>
+            <Text style={[styles.heroLabel, { color: colors.textSecondary }]}>Leave Management</Text>
+            <Text style={[styles.heroValue, { color: colors.text }]}>Hostel Leave</Text>
+          </View>
+          <View style={[styles.heroIconCircle, { backgroundColor: colors.primary + '20' }]}>
+            <CalendarCheck size={32} color={colors.primary} />
+          </View>
+        </View>
 
-        <View style={[styles.segmentedControl, { backgroundColor: colors.surface }]}>
+        <View style={[styles.segmentedContainer, { backgroundColor: colors.surface }]}>
           <TouchableOpacity
-            style={[styles.segmentButton, activeTab === 'APPLY' && { backgroundColor: colors.card, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 }]}
+            style={[styles.segmentItem, activeTab === 'APPLY' && { backgroundColor: colors.card }]}
             onPress={() => setActiveTab('APPLY')}
           >
+            <Send size={16} color={activeTab === 'APPLY' ? colors.primary : colors.textSecondary} />
             <Text style={[styles.segmentText, { color: activeTab === 'APPLY' ? colors.text : colors.textSecondary }]}>
               Apply Leave
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.segmentButton, activeTab === 'SLIP' && { backgroundColor: colors.card, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 }]}
+            style={[styles.segmentItem, activeTab === 'SLIP' && { backgroundColor: colors.card }]}
             onPress={() => setActiveTab('SLIP')}
           >
+            <FileText size={16} color={activeTab === 'SLIP' ? colors.primary : colors.textSecondary} />
             <Text style={[styles.segmentText, { color: activeTab === 'SLIP' ? colors.text : colors.textSecondary }]}>
               Leave Slip
             </Text>
@@ -58,12 +71,12 @@ export default function LeaveScreen() {
       </View>
 
       <View style={styles.webviewContainer}>
-        {/* ── Apply Leave WebView — stays mounted, only hidden ── */}
+        {/* ── Apply Leave WebView ── */}
         <View style={[styles.webviewWrapper, activeTab !== 'APPLY' && styles.hidden]}>
           {loadingApply && (
             <View style={[styles.loaderContainer, { backgroundColor: colors.background }]}>
               <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={[styles.loaderText, { color: colors.textSecondary }]}>Loading portal...</Text>
+              <Text style={[styles.loaderText, { color: colors.textSecondary }]}>Optimizing Portal View...</Text>
             </View>
           )}
           <WebView
@@ -77,12 +90,12 @@ export default function LeaveScreen() {
           />
         </View>
 
-        {/* ── Leave Slip WebView — stays mounted, only hidden ── */}
+        {/* ── Leave Slip WebView ── */}
         <View style={[styles.webviewWrapper, activeTab !== 'SLIP' && styles.hidden]}>
           {loadingSlip && (
             <View style={[styles.loaderContainer, { backgroundColor: colors.background }]}>
               <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={[styles.loaderText, { color: colors.textSecondary }]}>Loading portal...</Text>
+              <Text style={[styles.loaderText, { color: colors.textSecondary }]}>Fetching Latest Slip...</Text>
             </View>
           )}
           <WebView
@@ -96,74 +109,128 @@ export default function LeaveScreen() {
             thirdPartyCookiesEnabled={true}
           />
           
-          {/* Refresh Button for Slip */}
           <TouchableOpacity 
             style={[styles.refreshFab, { backgroundColor: colors.primary }]} 
             onPress={refreshSlip}
             activeOpacity={0.8}
           >
-            <RefreshCcw size={20} color="#fff" />
-            <Text style={styles.refreshFabText}>Refresh Slip</Text>
+            <RefreshCcw size={18} color="#fff" />
+            <Text style={styles.refreshFabText}>Reload Slip</Text>
           </TouchableOpacity>
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  header: {
-    paddingTop: Platform.OS === 'ios' ? 20 : 40,
-    paddingBottom: 15,
-    paddingHorizontal: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#C7C7CC',
+  container: {
+    flex: 1,
   },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#000', letterSpacing: -0.5, marginBottom: 20 },
-  segmentedControl: { flexDirection: 'row', backgroundColor: '#F2F2F7', borderRadius: 8, padding: 3 },
-  segmentButton: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 },
-  segmentActive: {
-    backgroundColor: '#fff',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1, shadowRadius: 2, elevation: 2,
+  heroHeader: {
+    paddingTop: Platform.OS === 'ios' ? 70 : 50,
+    paddingBottom: 25,
+    paddingHorizontal: 25,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+    elevation: 5,
+    zIndex: 10,
   },
-  segmentText: { fontSize: 14, fontWeight: '500', color: '#8E8E93' },
-  segmentTextActive: { color: '#000', fontWeight: '600' },
-  webviewContainer: { flex: 1 },
-  webviewWrapper: { ...StyleSheet.absoluteFillObject },
-  hidden: { display: 'none' },
+  heroContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 25,
+  },
+  heroLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  heroValue: {
+    fontSize: 32,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  heroIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentedContainer: {
+    flexDirection: 'row',
+    borderRadius: 16,
+    padding: 4,
+    gap: 4,
+  },
+  segmentItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  segmentText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  webviewContainer: {
+    flex: 1,
+    marginTop: -20, // Negative margin to tuck under header slightly
+  },
+  webviewWrapper: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  hidden: {
+    display: 'none',
+  },
   webview: {
     flex: 1,
     backgroundColor: 'transparent',
-    marginBottom: Platform.OS === 'ios' ? 80 : 60,
+    marginTop: 20,
+    marginBottom: Platform.OS === 'ios' ? 100 : 80,
   },
   loaderContainer: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center', alignItems: 'center',
-    backgroundColor: '#F2F2F7', zIndex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+    paddingTop: 100,
   },
-  loaderText: { marginTop: 10, color: '#8E8E93', fontSize: 14 },
+  loaderText: {
+    marginTop: 15,
+    fontSize: 14,
+    fontWeight: '600',
+  },
   refreshFab: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 150 : 130,
+    bottom: Platform.OS === 'ios' ? 140 : 120,
     alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 30,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   refreshFabText: {
     color: '#fff',
-    fontWeight: 'bold',
-    marginLeft: 8,
-    fontSize: 14,
+    fontWeight: '800',
+    marginLeft: 10,
+    fontSize: 15,
   },
 });

@@ -5,7 +5,7 @@ import { StyleSheet, View, Text, ScrollView, RefreshControl, TouchableOpacity, D
 import { useScraper } from '../../context/ScraperContext';
 import { useAuth } from '../../context/AuthContext';
 import { LogOut, Bell, Clock, Award, ChevronRight, CheckCircle2, FileText, UploadCloud, GraduationCap, Moon, Sun } from 'lucide-react-native';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme, Typography } from '../../context/ThemeContext';
 import { router } from 'expo-router';
 
 const { width } = Dimensions.get('window');
@@ -225,8 +225,13 @@ export default function DashboardScreen() {
                   <View style={[styles.sectionBadge, { backgroundColor: isDark ? colors.surface : '#F2F2F7' }]}>
                     <Text style={[styles.sectionText, { color: colors.text }]}>{profile.section}</Text>
                   </View>
+                  {profile.rollNo && (
+                    <View style={[styles.rollBadge, { backgroundColor: isDark ? 'rgba(255,149,0,0.15)' : '#FFF9E5' }]}>
+                      <Text style={[styles.rollText, { color: colors.warning }]}>Roll: {profile.rollNo}</Text>
+                    </View>
+                  )}
                 </View>
-                <Text style={[styles.programText, { color: colors.textSecondary }]} numberOfLines={1}>{profile.program}</Text>
+                <Text style={[styles.programText, { color: colors.textSecondary }]} numberOfLines={2}>{profile.program}</Text>
               </View>
             </View>
             <View style={[styles.syncRow, { borderTopColor: colors.border }]}>
@@ -373,17 +378,19 @@ export default function DashboardScreen() {
 
         {/* Announcements */}
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Announcements</Text>
-        <View style={styles.announcementContainer}>
+        <View style={[styles.announcementContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {data.announcements && data.announcements.length > 0 ? (
             data.announcements.slice(0, 10).map((item: any, index: number) => (
-              <View key={item.id || index} style={[styles.announcementCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={[styles.announcementIndicator, { backgroundColor: item.type === 'urgent' ? colors.error : colors.primary }]} />
-                <View style={styles.announcementContent}>
-                  <Text style={[styles.announcementTitle, { color: colors.text }]}>{item.title}</Text>
-                  <Text style={[styles.announcementDate, { color: colors.textSecondary }]}>{item.date}</Text>
+              <TouchableOpacity key={item.id || index} style={[styles.announcementCard, { borderBottomColor: colors.border }]}>
+                <View style={styles.announcementInner}>
+                  <View style={[styles.announcementIndicator, { backgroundColor: colors.primary }]} />
+                  <View style={styles.announcementContent}>
+                    <Text style={[styles.announcementTitle, { color: colors.text }]} numberOfLines={3}>{item.title}</Text>
+                    <Text style={[styles.announcementDate, { color: colors.textSecondary }]}>{item.date}</Text>
+                  </View>
                 </View>
-                <ChevronRight size={20} color={colors.textSecondary} />
-              </View>
+                <ChevronRight size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
             ))
           ) : (
             <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -835,40 +842,48 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   announcementContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
+    borderRadius: 24,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowRadius: 12,
     elevation: 3,
+    marginBottom: 40,
   },
   announcementCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: '#F2F2F7',
+  },
+  announcementInner: {
+    flex: 1,
+    flexDirection: 'row',
   },
   announcementIndicator: {
-    width: 4,
-    height: 40,
-    borderRadius: 2,
+    width: 3.5,
+    borderRadius: 10,
     marginRight: 15,
+    marginVertical: 4,
   },
   announcementContent: {
     flex: 1,
+    paddingRight: 10,
   },
   announcementTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 4,
+    ...Typography.bodyBold,
+    fontSize: 15.5,
+    lineHeight: 20,
+    marginBottom: 2,
   },
   announcementDate: {
-    fontSize: 13,
-    color: '#8E8E93',
+    ...Typography.body,
+    fontSize: 12,
+    opacity: 0.75,
+    marginTop: 0,
   },
   emptyCard: {
     backgroundColor: '#fff',

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Theme = 'light' | 'dark';
@@ -9,7 +9,18 @@ interface ThemeContextType {
   isDark: boolean;
   toggleTheme: () => void;
   colors: typeof LightColors;
+  fonts: typeof Typography;
 }
+
+export const Typography = {
+  h1: { fontSize: 32, fontWeight: '900' as const, letterSpacing: -1 },
+  h2: { fontSize: 24, fontWeight: '800' as const, letterSpacing: -0.5 },
+  h3: { fontSize: 18, fontWeight: '700' as const, letterSpacing: -0.5 },
+  body: { fontSize: 15, fontWeight: '500' as const },
+  bodyBold: { fontSize: 15, fontWeight: '700' as const },
+  caption: { fontSize: 12, fontWeight: '600' as const, textTransform: 'uppercase' as const, letterSpacing: 1 },
+  tiny: { fontSize: 10, fontWeight: '700' as const, textTransform: 'uppercase' as const },
+};
 
 const LightColors = {
   background: '#F8F9FB',
@@ -27,17 +38,17 @@ const LightColors = {
 };
 
 const DarkColors = {
-  background: '#000000',
-  card: '#1C1C1E',
-  text: '#FFFFFF',
-  textSecondary: '#AEAEB2',
+  background: '#0F1115', // Rich charcoal black
+  card: '#1A1C20',       // Slightly lighter card background
+  text: '#F5F5F7',       // Soft off-white for main text
+  textSecondary: '#9DA3AE', // Muted gray for secondary info
   primary: '#0A84FF',
   secondary: '#5E5CE6',
   success: '#30D158',
   warning: '#FF9F0A',
   error: '#FF453A',
-  border: '#38383A',
-  surface: '#2C2C2E',
+  border: '#2C2E33',     // Subtle border
+  surface: '#24272D',    // Inset surface color
   white: '#FFFFFF',
 };
 
@@ -66,7 +77,7 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
   const colors = isDark ? DarkColors : LightColors;
 
   return (
-    <ThemeContext.Provider value={{ theme, isDark, toggleTheme, colors }}>
+    <ThemeContext.Provider value={{ theme, isDark, toggleTheme, colors, fonts: Typography }}>
       {children}
     </ThemeContext.Provider>
   );
