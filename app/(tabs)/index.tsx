@@ -4,7 +4,8 @@ import { StyleSheet, View, Text, ScrollView, RefreshControl, TouchableOpacity, D
 // ... (other imports) ...
 import { useScraper } from '../../context/ScraperContext';
 import { useAuth } from '../../context/AuthContext';
-import { LogOut, Bell, Clock, Award, ChevronRight, CheckCircle2, FileText, UploadCloud, GraduationCap } from 'lucide-react-native';
+import { LogOut, Bell, Clock, Award, ChevronRight, CheckCircle2, FileText, UploadCloud, GraduationCap, Moon, Sun } from 'lucide-react-native';
+import { useTheme } from '../../context/ThemeContext';
 import { router } from 'expo-router';
 
 const { width } = Dimensions.get('window');
@@ -12,6 +13,7 @@ const { width } = Dimensions.get('window');
 export default function DashboardScreen() {
   const { data, isScraping, refreshData, dumpHtml } = useScraper();
   const { logout } = useAuth();
+  const { colors, isDark, toggleTheme } = useTheme();
 
   // Profile Data
   const profile = data.profile;
@@ -26,16 +28,17 @@ export default function DashboardScreen() {
 
   // Helper to find "Next Class" dynamically
   const getNextClass = () => {
-    if (!data.timetable) return null;
+    const timetable = data.timetable || {};
+    const makeupClasses = data.makeupClasses || [];
     
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const now = new Date();
     const currentDay = days[now.getDay()];
+    // Get date in DD-MMM-YYYY or DD MMM YYYY format to match makeup classes
+    const todayStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    
     const currentTimeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
     
-    const todayClasses = data.timetable[currentDay];
-    if (!todayClasses || todayClasses.length === 0) return { status: 'no_classes' };
-
     const parseTimeTo24h = (timeStr: string) => {
       if (!timeStr) return null;
       const match = timeStr.match(/(\d{1,2}):(\d{2})/);
@@ -49,7 +52,35 @@ export default function DashboardScreen() {
       return hours.toString().padStart(2, '0') + ':' + minutes;
     };
 
-    const upcoming = todayClasses.filter((c: any) => {
+    // 1. Combine regular classes for today and makeup classes for today
+    const candidates: any[] = [];
+    
+    // Regular classes
+    if (timetable[currentDay]) {
+      timetable[currentDay].forEach((c: any) => candidates.push({ ...c, isMakeup: false }));
+    }
+    
+    // Makeup classes
+    makeupClasses.forEach((c: any) => {
+      // Check if makeup class is today
+      if (c.date) {
+        const d = new Date(c.date);
+        if (d.toDateString() === now.toDateString()) {
+           candidates.push({ 
+             time: c.time, 
+             subject: c.subject, 
+             subjectCode: c.subjectCode,
+             room: c.room,
+             type: c.type || 'Makeup',
+             isMakeup: true 
+           });
+        }
+      }
+    });
+
+    if (candidates.length === 0) return { status: 'no_classes' };
+
+    const upcoming = candidates.filter((c: any) => {
       const startTime = parseTimeTo24h(c.time);
       return startTime ? startTime > currentTimeStr : false;
     });
@@ -60,23 +91,78 @@ export default function DashboardScreen() {
         const tB = parseTimeTo24h(b.time) || '';
         return tA.localeCompare(tB);
       });
+      
       const next = upcoming[0];
+      console.log('NEXT CLASS FOUND:', JSON.stringify(next));
+      
+      // Prioritize structured data if available (from new Scraper logic)
+      if (next.subjectCode || next.subject) {
+        return {
+          status: 'upcoming',
+          time: next.time,
+          subjectCode: next.subjectCode,
+          subject: next.subject,
+          room: next.room || 'TBA',
+          type: next.type || 'Lecture'
+        };
+      }
+
+      // Parse regular class details robustly for legacy/other formats
       const details = next.details || '';
-      const subjectMatch = details.match(/C:([A-Z0-9]+)/i);
-      const roomMatch = details.match(/R:\s*([A-Z0-9-]+)/i);
-      const typeMatch = details.match(/^([^/]+)/);
+      let subject = 'Class';
+      let subjectCode = '';
+      let room = 'TBA';
+      let type = 'Lecture';
+
+      if (details.includes('R:')) {
+        const subjectMatch = details.match(/^([^ ]+)/);
+        const roomMatch = details.match(/R:\s*([A-Z0-9-]+)/i);
+        subjectCode = subjectMatch ? subjectMatch[1] : '';
+        room = roomMatch ? roomMatch[1] : 'TBA';
+      } else {
+        const parts = details.split(/\s*\/\s*/);
+        if (parts.length >= 2) {
+          type = parts[0].trim();
+          const codePart = parts[1].trim();
+          const codeMatch = codePart.match(/^([A-Z0-9]+)/i);
+          subjectCode = codeMatch ? codeMatch[1] : '';
+          subject = codePart.split('-')[1]?.trim() || codePart;
+          room = parts[2] ? parts[2].trim() : 'TBA';
+        } else {
+          const codeMatch = details.match(/([A-Z]{2,}\d{2,})/i);
+          if (codeMatch) subjectCode = codeMatch[1];
+          const roomMatch = details.match(/(?:R:|Room:)\s*([A-Z0-9-]+)/i) || details.match(/\b(\d{2}-\d{3}[A-Z]?)\b/);
+          if (roomMatch) room = roomMatch[1] || room;
+        }
+      }
+
       return {
         status: 'upcoming',
         time: next.time,
-        subject: subjectMatch ? subjectMatch[1] : 'Class',
-        room: roomMatch ? roomMatch[1] : 'TBA',
-        type: typeMatch ? typeMatch[1].trim() : 'Lecture'
+        subjectCode: subjectCode,
+        subject: subject,
+        room: room,
+        type: type
       };
     }
     return { status: 'finished' };
   };
 
   const nextClassInfo = getNextClass();
+
+  const nextExam = (() => {
+    if (!data.exams || data.exams.length === 0) return null;
+    const now = new Date();
+    // Reset time for date-only comparison
+    now.setHours(0, 0, 0, 0);
+    const futureExams = data.exams.filter((ex: any) => {
+      const exDate = new Date(ex.date);
+      return exDate >= now;
+    });
+    if (futureExams.length === 0) return null;
+    futureExams.sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    return futureExams[0];
+  })();
 
   const [showMessages, setShowMessages] = React.useState(false);
 
@@ -85,9 +171,9 @@ export default function DashboardScreen() {
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
     <ScrollView 
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       refreshControl={
         <RefreshControl 
           refreshing={isScraping} 
@@ -102,50 +188,52 @@ export default function DashboardScreen() {
       contentContainerStyle={{ paddingBottom: 100 }}
     >
       {/* Enhanced Header Section with Profile */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <View style={styles.headerTop}>
           <View>
-            <Text style={styles.welcomeText}>Welcome back,</Text>
-            <Text style={styles.nameLarge}>{profile?.name?.split(' ')[0] || 'Student'}</Text>
+            <Text style={[styles.welcomeText, { color: isDark ? colors.textSecondary : '#8E8E93' }]}>Welcome back,</Text>
+            <Text style={[styles.nameLarge, { color: colors.text }]}>{profile?.name?.split(' ')[0] || 'Student'}</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity style={styles.notificationBtn} onPress={dumpHtml}>
-              <Award size={20} color="#FF9500" />
+            <TouchableOpacity style={[styles.notificationBtn, { backgroundColor: colors.surface }]} onPress={toggleTheme}>
+              {isDark ? <Sun size={20} color={colors.warning} /> : <Moon size={20} color={colors.primary} />}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.notificationBtn} onPress={() => setShowMessages(true)}>
-              <Bell size={20} color="#007AFF" />
+            <TouchableOpacity style={[styles.notificationBtn, { backgroundColor: colors.surface }]} onPress={() => setShowMessages(true)}>
+              <Bell size={20} color={colors.primary} />
               {data.messages && data.messages.length > 0 && (
                 <View style={styles.notifBadge}>
                   <Text style={styles.notifText}>{data.messages.length}</Text>
                 </View>
               )}
             </TouchableOpacity>
-            <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-              <LogOut size={18} color="#FF3B30" />
+            <TouchableOpacity onPress={logout} style={[styles.logoutBtn, { backgroundColor: isDark ? 'rgba(255,59,48,0.2)' : '#FFF2F2' }]}>
+              <LogOut size={18} color={colors.error} />
             </TouchableOpacity>
           </View>
         </View>
 
         {profile && (
-          <View style={styles.premiumProfileCard}>
+          <View style={[styles.premiumProfileCard, { backgroundColor: isDark ? '#2C2C2E' : '#FAFAFA', borderColor: colors.border }]}>
             <View style={styles.profileRow}>
               <Image source={{ uri: profile.avatarUrl }} style={styles.avatarLarge} />
               <View style={styles.profileDetails}>
-                <Text style={styles.fullName}>{profile.name}</Text>
+                <Text style={[styles.fullName, { color: colors.text }]}>{profile.name}</Text>
                 <View style={styles.badgeRow}>
-                  <View style={styles.vidBadge}>
-                    <Text style={styles.vidText}>{profile.vid}</Text>
+                  <View style={[styles.vidBadge, { backgroundColor: isDark ? 'rgba(10,132,255,0.15)' : '#E5F1FF' }]}>
+                    <Text style={[styles.vidText, { color: colors.primary }]}>{profile.vid}</Text>
                   </View>
-                  <View style={styles.sectionBadge}>
-                    <Text style={styles.sectionText}>{profile.section}</Text>
+                  <View style={[styles.sectionBadge, { backgroundColor: isDark ? colors.surface : '#F2F2F7' }]}>
+                    <Text style={[styles.sectionText, { color: colors.text }]}>{profile.section}</Text>
                   </View>
                 </View>
-                <Text style={styles.programText} numberOfLines={1}>{profile.program}</Text>
+                <Text style={[styles.programText, { color: colors.textSecondary }]} numberOfLines={1}>{profile.program}</Text>
               </View>
             </View>
-            <View style={styles.syncRow}>
+            <View style={[styles.syncRow, { borderTopColor: colors.border }]}>
               <View style={styles.statusDot} />
-              <Text style={styles.syncText}>Last synced: Just now</Text>
+              <Text style={styles.syncText}>
+                Last synced: {data.lastUpdated ? new Date(data.lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Never'}
+              </Text>
             </View>
           </View>
         )}
@@ -154,22 +242,22 @@ export default function DashboardScreen() {
       <View style={styles.content}>
         {/* Simplified Fee Section */}
         <TouchableOpacity 
-          style={styles.feeCard} 
-          onPress={() => Linking.openURL('https://ums.lpu.in/lpuums/FeeManagement/frmStudentFeeDetail.aspx')}
+          style={[styles.feeCard, { backgroundColor: colors.card, borderColor: colors.border }]} 
+          onPress={() => router.push('/fees' as any)}
           activeOpacity={0.8}
         >
           <View style={styles.feeInfo}>
-            <View style={styles.feeIconBg}>
-              <FileText size={24} color="#5856D6" />
+            <View style={[styles.feeIconBg, { backgroundColor: isDark ? colors.surface : '#F2F2F7' }]}>
+              <FileText size={24} color={colors.secondary} />
             </View>
             <View>
-              <Text style={styles.feeLabel}>Outstanding Fee</Text>
-              <Text style={styles.feeValue}>₹ {data.fee || '0'}/-</Text>
+              <Text style={[styles.feeLabel, { color: colors.textSecondary }]}>Outstanding Fee</Text>
+              <Text style={[styles.feeValue, { color: colors.text }]}>₹ {data.fee || '0'}/-</Text>
             </View>
           </View>
-          <View style={styles.payButton}>
-            <Text style={styles.payButtonText}>View Details</Text>
-            <ChevronRight size={16} color="#5856D6" />
+          <View style={[styles.payButton, { backgroundColor: isDark ? 'rgba(88,86,214,0.1)' : '#F2F2F7' }]}>
+            <Text style={[styles.payButtonText, { color: colors.secondary }]}>View Details</Text>
+            <ChevronRight size={16} color={colors.secondary} />
           </View>
         </TouchableOpacity>
         
@@ -179,7 +267,7 @@ export default function DashboardScreen() {
         {/* CGPA & Attendance Grid */}
         <View style={styles.gridContainer}>
           <TouchableOpacity 
-            style={[styles.gridCard, { backgroundColor: '#007AFF' }]}
+            style={[styles.gridCard, { backgroundColor: colors.primary }]}
             onPress={() => router.push('/results')}
             activeOpacity={0.9}
           >
@@ -190,7 +278,7 @@ export default function DashboardScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={[styles.gridCard, { backgroundColor: '#34C759' }]}
+            style={[styles.gridCard, { backgroundColor: colors.success }]}
             onPress={() => router.push('/attendance')}
             activeOpacity={0.9}
           >
@@ -201,98 +289,105 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Upcoming Exams Button */}
-        <TouchableOpacity style={styles.examsBanner} onPress={handleExamsPress} activeOpacity={0.8}>
-          <View style={styles.examsBannerIcon}>
+        {/* Upcoming Exams Banner */}
+        <TouchableOpacity style={[styles.examsBanner, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={handleExamsPress} activeOpacity={0.8}>
+          <View style={[styles.examsBannerIcon, { backgroundColor: nextExam ? colors.error : colors.primary }]}>
             <GraduationCap size={24} color="#fff" />
           </View>
           <View style={styles.examsBannerTextContainer}>
-            <Text style={styles.examsBannerTitle}>Upcoming Exams</Text>
-            <Text style={styles.examsBannerSubtitle}>View Conduct & Seating Plan</Text>
+            <Text style={[styles.examsBannerTitle, { color: colors.text }]}>
+              {nextExam ? `Next Exam: ${nextExam.date}` : 'Upcoming Exams'}
+            </Text>
+            <Text style={[styles.examsBannerSubtitle, { color: colors.textSecondary }]}>
+              {nextExam ? `${nextExam.subjectCode} - ${nextExam.room}` : 'View Conduct & Seating Plan'}
+            </Text>
           </View>
-          <ChevronRight size={20} color="#007AFF" />
+          <ChevronRight size={20} color={isDark ? colors.textSecondary : colors.primary} />
         </TouchableOpacity>
 
         {/* Pending Assignments */}
-        <Text style={styles.sectionTitle}>Pending Assignments</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Pending Assignments</Text>
         {data.assignments && data.assignments.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
             {data.assignments.map((assignment, index) => (
-              <View key={index} style={styles.assignmentCard}>
+              <View key={index} style={[styles.assignmentCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={{ flex: 1 }}>
                   <View style={styles.assignmentHeader}>
-                    <FileText size={18} color="#FF9500" />
-                    <Text style={styles.assignmentCourse} numberOfLines={1}>{assignment.courseCode}</Text>
+                    <FileText size={18} color={colors.warning} />
+                    <Text style={[styles.assignmentCourse, { color: colors.text }]} numberOfLines={1}>{assignment.courseCode}</Text>
                   </View>
-                  <Text style={styles.assignmentType} numberOfLines={2}>{assignment.type}</Text>
+                  <Text style={[styles.assignmentType, { color: colors.textSecondary }]} numberOfLines={2}>{assignment.type}</Text>
                 </View>
                 
                 <View style={styles.assignmentFooter}>
-                  <Text style={styles.assignmentDate}>Last Date: {assignment.lastDate}</Text>
+                  <Text style={[styles.assignmentDate, { color: colors.textSecondary }]}>Last Date: {assignment.lastDate}</Text>
                   <TouchableOpacity 
-                    style={styles.uploadButton}
-                    onPress={() => Linking.openURL('https://ums.lpu.in/lpuums/frmstudentassignmentupload.aspx')}
+                    style={[styles.uploadButton, { backgroundColor: isDark ? 'rgba(10,132,255,0.1)' : 'rgba(0,122,255,0.05)' }]}
+                    onPress={() => router.push('/assignments_upload' as any)}
                   >
-                    <UploadCloud size={14} color="#007AFF" />
-                    <Text style={styles.uploadButtonText}>Upload</Text>
+                    <UploadCloud size={14} color={colors.primary} />
+                    <Text style={[styles.uploadButtonText, { color: colors.primary }]}>Upload</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             ))}
           </ScrollView>
         ) : (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyText}>No pending assignments.</Text>
+          <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No pending assignments.</Text>
           </View>
         )}
 
         {/* Next Class Widget */}
-        <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Next Class</Text>
+        <Text style={[styles.sectionTitle, { marginTop: 20, color: colors.text }]}>Next Class</Text>
         {nextClassInfo.status === 'upcoming' ? (
-          <View style={styles.nextClassCard}>
+          <View style={[styles.nextClassCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.nextClassHeader}>
-              <View style={styles.timeBadge}>
-                <Clock size={14} color="#FF9500" />
-                <Text style={styles.timeText}>{nextClassInfo.time}</Text>
+              <View style={[styles.timeBadge, { backgroundColor: isDark ? 'rgba(255,159,10,0.1)' : 'rgba(255,149,0,0.1)' }]}>
+                <Clock size={14} color={colors.warning} />
+                <Text style={[styles.timeText, { color: colors.warning }]}>{nextClassInfo.time}</Text>
               </View>
-              <View style={[styles.roomBadge, { flexDirection: 'row', alignItems: 'center' }]}>
-                <Text style={{ color: '#007AFF', fontSize: 10, fontWeight: 'bold' }}>Room: </Text>
-                <Text style={styles.roomText}>{nextClassInfo.room}</Text>
+              <View style={[styles.roomBadge, { flexDirection: 'row', alignItems: 'center', backgroundColor: isDark ? 'rgba(10,132,255,0.1)' : 'rgba(0,122,255,0.1)' }]}>
+                <Text style={{ color: colors.primary, fontSize: 10, fontWeight: 'bold' }}>Room: </Text>
+                <Text style={[styles.roomText, { color: colors.primary }]}>{nextClassInfo.room}</Text>
               </View>
             </View>
-            <Text style={styles.subjectText}>{nextClassInfo.subject}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <Text style={[styles.courseCode, { color: colors.primary, marginBottom: 0 }]}>{nextClassInfo.subjectCode}</Text>
+            </View>
+            <Text style={[styles.subjectText, { color: colors.text }]}>{nextClassInfo.subject}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-              <View style={{ backgroundColor: 'rgba(0,122,255,0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
-                <Text style={{ color: '#007AFF', fontSize: 11, fontWeight: '600' }}>{nextClassInfo.type}</Text>
+              <View style={{ backgroundColor: isDark ? 'rgba(10,132,255,0.15)' : 'rgba(0,122,255,0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
+                <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '600' }}>{nextClassInfo.type}</Text>
               </View>
             </View>
           </View>
         ) : (
-          <View style={styles.emptyCard}>
-            <CheckCircle2 size={24} color="#34C759" style={{ marginBottom: 8 }} />
-            <Text style={styles.emptyText}>
+          <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <CheckCircle2 size={24} color={colors.success} style={{ marginBottom: 8 }} />
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
               {nextClassInfo.status === 'no_classes' ? 'No classes scheduled for today.' : 'All classes finished for today! 🎉'}
             </Text>
           </View>
         )}
 
         {/* Announcements */}
-        <Text style={styles.sectionTitle}>Announcements</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Announcements</Text>
         <View style={styles.announcementContainer}>
           {data.announcements && data.announcements.length > 0 ? (
             data.announcements.slice(0, 10).map((item: any, index: number) => (
-              <View key={item.id || index} style={styles.announcementCard}>
-                <View style={[styles.announcementIndicator, { backgroundColor: item.type === 'urgent' ? '#FF3B30' : '#007AFF' }]} />
+              <View key={item.id || index} style={[styles.announcementCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={[styles.announcementIndicator, { backgroundColor: item.type === 'urgent' ? colors.error : colors.primary }]} />
                 <View style={styles.announcementContent}>
-                  <Text style={styles.announcementTitle}>{item.title}</Text>
-                  <Text style={styles.announcementDate}>{item.date}</Text>
+                  <Text style={[styles.announcementTitle, { color: colors.text }]}>{item.title}</Text>
+                  <Text style={[styles.announcementDate, { color: colors.textSecondary }]}>{item.date}</Text>
                 </View>
-                <ChevronRight size={20} color="#C7C7CC" />
+                <ChevronRight size={20} color={colors.textSecondary} />
               </View>
             ))
           ) : (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No new announcements.</Text>
+            <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No new announcements.</Text>
             </View>
           )}
         </View>
@@ -301,31 +396,31 @@ export default function DashboardScreen() {
     </ScrollView>
       {/* Modal for My Messages */}
       <Modal visible={showMessages} animationType="slide" transparent={true}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>My Messages</Text>
-              <TouchableOpacity onPress={() => setShowMessages(false)} style={styles.closeBtn}>
-                <Text style={styles.closeBtnText}>Close</Text>
+        <View style={[styles.modalOverlay, { backgroundColor: isDark ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.5)' }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>My Messages</Text>
+              <TouchableOpacity onPress={() => setShowMessages(false)} style={[styles.closeBtn, { backgroundColor: colors.surface }]}>
+                <Text style={[styles.closeBtnText, { color: colors.primary }]}>Close</Text>
               </TouchableOpacity>
             </View>
             
             <ScrollView style={styles.messagesList} showsVerticalScrollIndicator={false}>
               {data.messages && data.messages.length > 0 ? (
                 data.messages.map((item, idx) => (
-                  <View key={item.id || idx} style={styles.messageItem}>
-                    <View style={styles.messageMarker} />
+                  <View key={item.id || idx} style={[styles.messageItem, { backgroundColor: isDark ? colors.surface : '#FAFAFA', borderColor: colors.border }]}>
+                    <View style={[styles.messageMarker, { backgroundColor: colors.primary }]} />
                     <View style={styles.messageBody}>
-                      <Text style={styles.messageTitle}>{item.title}</Text>
-                      <Text style={styles.messageDate}>{item.date}</Text>
-                      <Text style={styles.messageContent}>{item.content}</Text>
+                      <Text style={[styles.messageTitle, { color: colors.text }]}>{item.title}</Text>
+                      <Text style={[styles.messageDate, { color: colors.textSecondary }]}>{item.date}</Text>
+                      <Text style={[styles.messageContent, { color: isDark ? colors.textSecondary : '#666' }]}>{item.content}</Text>
                     </View>
                   </View>
                 ))
               ) : (
                 <View style={styles.emptyState}>
-                  <Bell size={40} color="#CCC" />
-                  <Text style={styles.emptyText}>No personal messages</Text>
+                  <Bell size={40} color={colors.textSecondary} />
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No personal messages</Text>
                 </View>
               )}
             </ScrollView>
@@ -339,7 +434,6 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7', // iOS System Background Color
   },
   header: {
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
@@ -808,7 +902,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingBottom: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#F2F2F7',
+    borderBottomColor: 'transparent',
   },
   modalTitle: {
     fontSize: 20,

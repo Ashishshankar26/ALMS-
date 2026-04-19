@@ -1,77 +1,126 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, ScrollView } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { router } from 'expo-router';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Calendar, Clock, MapPin, User } from 'lucide-react-native';
 import { useScraper } from '../context/ScraperContext';
+import { useTheme } from '../context/ThemeContext';
 
 const EXAMS_URL = 'https://ums.lpu.in/lpuums/frmStudentDateSheetConduction.aspx';
 
 export default function ExamsScreen() {
   const { data } = useScraper();
+  const { colors, isDark } = useTheme();
   const [loading, setLoading] = useState(true);
+  const [showWebView, setShowWebView] = useState(false);
+  const exams = data.exams || [];
   const currentExamsUrl = data.examUrl || EXAMS_URL;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <ArrowLeft size={22} color="#007AFF" />
+          <ArrowLeft size={22} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={styles.title}>Upcoming Exams</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Upcoming Exams</Text>
         <View style={{ width: 44 }} />
       </View>
 
-      {/* Loading overlay */}
-      {loading && (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loaderText}>Loading exam schedule...</Text>
-        </View>
-      )}
+      {/* Native Exam List */}
+      {!showWebView && exams.length > 0 ? (
+        <ScrollView style={styles.examList} contentContainerStyle={{ padding: 20 }}>
+          {exams.map((exam: any, index: number) => (
+            <View key={index} style={[styles.examCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.examHeader}>
+                <View style={[styles.dateBadge, { backgroundColor: isDark ? 'rgba(255,59,48,0.1)' : '#FFF2F2' }]}>
+                  <Calendar size={14} color={colors.error} />
+                  <Text style={[styles.dateText, { color: colors.error }]}>{exam.date}</Text>
+                </View>
+                <View style={[styles.timeBadge, { backgroundColor: isDark ? 'rgba(10,132,255,0.1)' : '#E5F1FF' }]}>
+                  <Clock size={14} color={colors.primary} />
+                  <Text style={[styles.timeText, { color: colors.primary }]}>{exam.time}</Text>
+                </View>
+              </View>
 
-      <WebView
-        source={{ uri: currentExamsUrl }}
-        userAgent="Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"
-        style={[styles.webview, loading && { opacity: 0 }]}
-        onLoadEnd={() => setLoading(false)}
-        sharedCookiesEnabled={true}
-        thirdPartyCookiesEnabled={true}
-        injectedJavaScript={`
-          (function() {
-            // Hide everything except the main content
-            var s = document.createElement('style');
-            s.innerHTML = \`
-              #Happeningleft, .lpu-naac, .header-wrapper, footer, .top-nav, .side-nav, #id_header, .footer-wrapper { 
-                display: none !important; 
+              <Text style={[styles.courseCode, { color: colors.primary }]}>{exam.subjectCode}</Text>
+              <Text style={[styles.subjectName, { color: colors.text }]}>{exam.subject}</Text>
+
+              <View style={styles.footerRow}>
+                <View style={styles.metaItem}>
+                  <MapPin size={16} color={colors.textSecondary} />
+                  <Text style={[styles.metaText, { color: colors.textSecondary }]}>Room: {exam.room}</Text>
+                </View>
+                {exam.seat && (
+                  <View style={styles.metaItem}>
+                    <User size={16} color={colors.textSecondary} />
+                    <Text style={[styles.metaText, { color: colors.textSecondary }]}>Seat: {exam.seat}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          ))}
+          
+          <TouchableOpacity 
+            style={[styles.webFallbackBtn, { borderColor: colors.border }]} 
+            onPress={() => setShowWebView(true)}
+          >
+            <Text style={{ color: colors.textSecondary }}>View Original Date Sheet</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      ) : (!showWebView && !loading && exams.length === 0) ? (
+        <View style={styles.emptyContainer}>
+          <Calendar size={60} color={colors.border} />
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>No Exams Found</Text>
+          <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>Your date sheet might not be available yet.</Text>
+          <TouchableOpacity 
+            style={[styles.webFallbackBtn, { marginTop: 20, borderColor: colors.primary }]} 
+            onPress={() => setShowWebView(true)}
+          >
+            <Text style={{ color: colors.primary, fontWeight: '600' }}>Open Web Seating Plan</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <WebView
+          source={{ uri: currentExamsUrl }}
+          userAgent="Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"
+          style={[styles.webview, loading && { opacity: 0 }]}
+          onLoadEnd={() => setLoading(false)}
+          sharedCookiesEnabled={true}
+          thirdPartyCookiesEnabled={true}
+          injectedJavaScript={`
+            (function() {
+              var s = document.createElement('style');
+              s.innerHTML = \`
+                #Happeningleft, .lpu-naac, .header-wrapper, footer, .top-nav, .side-nav, #id_header, .footer-wrapper { 
+                  display: none !important; 
+                }
+                .form-info, .page-content, .container-fluid, body, html { 
+                  width: 100% !important; 
+                  padding: 0 !important; 
+                  margin: 0 !important;
+                  background: white !important;
+                }
+                table { width: 100% !important; zoom: 0.9; }
+                .card { border: none !important; box-shadow: none !important; }
+              \`;
+              document.head.appendChild(s);
+              
+              if (document.body.innerText.includes('Login') && document.querySelectorAll('input[type="password"]').length > 0) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'SESSION_EXPIRED' }));
               }
-              .form-info, .page-content, .container-fluid, body, html { 
-                width: 100% !important; 
-                padding: 0 !important; 
-                margin: 0 !important;
-                background: white !important;
+            })(); true;
+          `}
+          onMessage={(event) => {
+            try {
+              const msg = JSON.parse(event.nativeEvent.data);
+              if (msg.type === 'SESSION_EXPIRED') {
+                router.replace('/login');
               }
-              table { width: 100% !important; zoom: 0.9; }
-              .card { border: none !important; box-shadow: none !important; }
-            \`;
-            document.head.appendChild(s);
-            
-            // Check for session expiry
-            if (document.body.innerText.includes('Login') && document.querySelectorAll('input[type="password"]').length > 0) {
-              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'SESSION_EXPIRED' }));
-            }
-          })(); true;
-        `}
-        onMessage={(event) => {
-          try {
-            const msg = JSON.parse(event.nativeEvent.data);
-            if (msg.type === 'SESSION_EXPIRED') {
-              router.replace('/login');
-            }
-          } catch(e) {}
-        }}
-      />
+            } catch(e) {}
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -99,4 +148,68 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', zIndex: 1,
   },
   loaderText: { marginTop: 12, color: '#8E8E93', fontSize: 15 },
+  examList: { flex: 1 },
+  examCard: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 16,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  examHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  dateBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  timeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  dateText: { fontSize: 12, fontWeight: 'bold' },
+  timeText: { fontSize: 12, fontWeight: 'bold' },
+  courseCode: { fontSize: 14, fontWeight: 'bold', marginBottom: 4 },
+  subjectName: { fontSize: 16, fontWeight: '600', marginBottom: 15 },
+  footerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E5E5EA',
+  },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  metaText: { fontSize: 13, fontWeight: '500' },
+  webFallbackBtn: {
+    marginTop: 10,
+    padding: 15,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyTitle: { fontSize: 20, fontWeight: 'bold', marginTop: 20 },
+  emptySubtitle: { fontSize: 14, textAlign: 'center', marginTop: 8 },
 });

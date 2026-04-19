@@ -2,43 +2,64 @@ import React, { useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import { useScraper } from '../../context/ScraperContext';
 import { Clock, MapPin, Tag } from 'lucide-react-native';
+import { useTheme } from '../../context/ThemeContext';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
 export default function TimetableScreen() {
   const { data } = useScraper();
+  const { colors, isDark } = useTheme();
   const timetable = data.timetable || {};
   const [activeDay, setActiveDay] = useState('Monday');
 
-  // Extract Makeup Classes (Saturday & Sunday) and filter out non-classes like "Project Work"
-  const makeupClasses = [
-    ...(timetable['Saturday'] || []),
-    ...(timetable['Sunday'] || [])
-  ]
-  .filter(cls => cls.subject && !/Project Work/i.test(cls.subject))
-  .map(cls => ({ ...cls, isMakeup: true, dayName: cls.dayName || 'Weekend' }));
+  // Extract ALL Makeup/Adjustment Classes
+  const makeupClasses: any[] = [];
+
+  // 1. Add classes from the dedicated makeup page (high quality)
+  if (data.makeupClasses && data.makeupClasses.length > 0) {
+    data.makeupClasses.forEach(cls => {
+      makeupClasses.push({ ...cls, isMakeup: true });
+    });
+  }
+
+  // 2. Add classes found in the regular timetable (as fallback)
+  Object.keys(timetable).forEach(day => {
+    (timetable[day] || []).forEach((cls: any) => {
+      if (cls.date) {
+        // Check for duplicates (same date, time, and subject code)
+        const exists = makeupClasses.some(m =>
+          m.date === cls.date &&
+          m.time === cls.time &&
+          m.subjectCode === cls.subjectCode
+        );
+        if (!exists) {
+          makeupClasses.push({ ...cls, isMakeup: true, dayName: day });
+        }
+      }
+    });
+  });
 
   const classesForDay = timetable[activeDay] || [];
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Schedule</Text>
-        
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <Text style={[styles.title, { color: colors.text }]}>Schedule</Text>
+
         {/* Day Selector */}
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.daySelector}
           contentContainerStyle={{ paddingHorizontal: 20 }}
         >
           {DAYS.map((day) => (
-            <TouchableOpacity 
+            <TouchableOpacity
               key={day}
-              style={[styles.dayButton, activeDay === day && styles.dayButtonActive]}
+              style={[styles.dayButton, { backgroundColor: colors.surface }, activeDay === day && { backgroundColor: colors.primary }]}
               onPress={() => setActiveDay(day)}
             >
-              <Text style={[styles.dayText, activeDay === day && styles.dayTextActive]}>
+              <Text style={[styles.dayText, { color: colors.textSecondary }, activeDay === day && { color: '#fff' }]}>
                 {day.substring(0, 3)}
               </Text>
             </TouchableOpacity>
@@ -47,50 +68,97 @@ export default function TimetableScreen() {
       </View>
 
       <ScrollView style={styles.list} contentContainerStyle={{ paddingBottom: 100 }}>
-        
+
         {/* Makeup Classes Section */}
         <View style={styles.makeupSection}>
-          <Text style={styles.sectionTitle}>Makeup Classes</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Makeup Classes</Text>
           {makeupClasses.length > 0 ? (
-            makeupClasses.map((cls: any, index: number) => {
-              const timeParts = (cls.time || "").split(/\s*-\s*/);
-              const startTime = timeParts[0] || "--:--";
-              const endTimeFull = timeParts[1] || "";
-              const endTime = endTimeFull.split(/\s+/)[0] || "--:--";
-              const ampm = (cls.time || "").toUpperCase().includes('PM') ? 'PM' : 'AM';
-              
-              return (
-                <View key={index} style={[styles.classCard, styles.makeupCard]}>
-                  <View style={styles.timeColumn}>
-                    <Text style={styles.timeStart}>{startTime}</Text>
-                    <View style={styles.timeLine} />
-                    <View style={{ alignItems: 'center', marginTop: -2 }}>
-                      <Text style={styles.timeEnd}>{endTime}</Text>
-                      <Text style={styles.timeAmpm}>{ampm}</Text>
+            <View style={makeupClasses.length > 1 ? styles.makeupGridContainer : null}>
+              {makeupClasses.map((cls: any, index: number) => {
+                const isGrid = makeupClasses.length > 1;
+                const timeParts = (cls.time || "").split(/\s*-\s*/);
+                const startTime = timeParts[0] || "--:--";
+                const endTimeFull = timeParts[1] || "";
+                const endTime = endTimeFull.split(/\s+/)[0] || "--:--";
+                const ampm = (cls.time || "").toUpperCase().includes('PM') ? 'PM' : 'AM';
+
+                return (
+                  <View key={index} style={[
+                    styles.classCard, 
+                    isGrid ? styles.makeupGridCard : styles.makeupSingleCard,
+                    { backgroundColor: colors.card }
+                  ]}>
+                    {!isGrid && (
+                      <View style={styles.timeColumn}>
+                        <Text style={[styles.timeStart, { color: colors.text }]}>{startTime}</Text>
+                        <View style={[styles.timeLine, { backgroundColor: isDark ? 'rgba(255,149,0,0.3)' : '#FFD60A' }]} />
+                        <View style={{ alignItems: 'center', marginTop: -2 }}>
+                          <Text style={[styles.timeEnd, { color: colors.textSecondary }]}>{endTime}</Text>
+                          <Text style={[styles.timeAmpm, { color: colors.textSecondary }]}>{ampm}</Text>
+                        </View>
+                      </View>
+                    )}
+                    
+                    <View style={isGrid ? { flex: 1 } : styles.classInfo}>
+                      <Text style={[styles.makeupDate, { color: colors.warning, fontSize: isGrid ? 11 : 13 }]}>
+                        {cls.date} {cls.dayName ? `(${cls.dayName})` : ''}
+                      </Text>
+
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                        <Text style={[styles.courseCode, { color: colors.primary, marginBottom: 0, fontSize: isGrid ? 12 : 14 }]}>
+                          {cls.subjectCode}
+                        </Text>
+                      </View>
+                      
+                      <Text 
+                        style={[styles.subjectName, { color: colors.text, fontSize: isGrid ? 14 : 18, marginBottom: 8 }]}
+                        numberOfLines={isGrid ? 2 : undefined}
+                      >
+                        {cls.subject}
+                      </Text>
+
+                      {isGrid && (
+                         <View style={[styles.metaRow, { marginBottom: 2 }]}>
+                            <Clock size={12} color={colors.textSecondary} />
+                            <Text style={[styles.metaText, { color: colors.textSecondary, fontSize: 11, marginLeft: 4 }]}>{startTime}</Text>
+                         </View>
+                      )}
+
+                      <View style={styles.metaRow}>
+                        <MapPin size={isGrid ? 12 : 14} color={colors.textSecondary} />
+                        <Text style={[styles.metaText, { color: colors.textSecondary, fontSize: isGrid ? 11 : 14, marginLeft: isGrid ? 4 : 8 }]}>
+                          {isGrid ? cls.room : `Room: ${cls.room}`}
+                        </Text>
+                      </View>
+
+                      {!isGrid && cls.faculty ? (
+                        <View style={styles.metaRow}>
+                          <Clock size={14} color={colors.textSecondary} />
+                          <Text style={[styles.metaText, { color: colors.textSecondary }]}>{cls.faculty}</Text>
+                        </View>
+                      ) : null}
+
+                      {!isGrid && cls.category ? (
+                        <View style={[styles.metaRow, { marginTop: 4 }]}>
+                          <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                            <Text style={{ fontSize: 10, color: colors.textSecondary, fontWeight: 'bold' }}>{cls.category.toUpperCase()}</Text>
+                          </View>
+                        </View>
+                      ) : null}
                     </View>
                   </View>
-                  <View style={styles.classInfo}>
-                    <Text style={styles.makeupDate}>
-                      {cls.dayName || 'Saturday'} {cls.date ? `(${cls.date})` : ''}
-                    </Text>
-                    <Text style={styles.subjectName}>: {cls.subject}</Text>
-                    <View style={styles.metaRow}>
-                      <MapPin size={14} color="#8E8E93" />
-                      <Text style={styles.metaText}>{cls.room}</Text>
-                    </View>
-                  </View>
-                </View>
-              );
-            })
+                );
+              })}
+            </View>
           ) : (
-            <View style={[styles.emptyCard, { backgroundColor: '#FFFBE6', borderColor: '#FFD60A', borderWidth: 1 }]}>
-              <Text style={[styles.emptyText, { color: '#FF9500' }]}>No makeup classes assigned.</Text>
+            <View style={[styles.emptyCard, { backgroundColor: isDark ? 'rgba(255,159,10,0.1)' : '#FFFBE6', borderColor: colors.warning, borderWidth: 1 }]}>
+              <Text style={[styles.emptyText, { color: colors.warning }]}>No makeup classes assigned.</Text>
             </View>
           )}
         </View>
 
         {/* Regular Schedule Section */}
-        <Text style={styles.sectionTitle}>Regular Schedule</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Regular Schedule</Text>
         {classesForDay.length > 0 ? (
           classesForDay.map((cls: any, index: number) => {
             const timeParts = (cls.time || "").split(/\s*-\s*/);
@@ -100,30 +168,30 @@ export default function TimetableScreen() {
             const ampm = (cls.time || "").toUpperCase().includes('PM') ? 'PM' : 'AM';
 
             return (
-              <View key={cls.id || index} style={styles.classCard}>
+              <View key={cls.id || index} style={[styles.classCard, { backgroundColor: colors.card }]}>
                 <View style={styles.timeColumn}>
-                  <Text style={styles.timeStart}>{startTime}</Text>
-                  <View style={styles.timeLine} />
+                  <Text style={[styles.timeStart, { color: colors.text }]}>{startTime}</Text>
+                  <View style={[styles.timeLine, { backgroundColor: colors.border }]} />
                   <View style={{ alignItems: 'center', marginTop: -2 }}>
-                    <Text style={styles.timeEnd}>{endTime}</Text>
-                    <Text style={styles.timeAmpm}>{ampm}</Text>
+                    <Text style={[styles.timeEnd, { color: colors.textSecondary }]}>{endTime}</Text>
+                    <Text style={[styles.timeAmpm, { color: colors.textSecondary }]}>{ampm}</Text>
                   </View>
                 </View>
-                
+
                 <View style={styles.classInfo}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                     <Text style={[styles.courseCode, { color: '#007AFF', marginBottom: 0 }]}>{cls.subjectCode}</Text>
+                    <Text style={[styles.courseCode, { color: colors.primary, marginBottom: 0 }]}>{cls.subjectCode}</Text>
                   </View>
-                  <Text style={[styles.subjectName, { fontSize: 18 }]}>{cls.subject}</Text>
-                  
+                  <Text style={[styles.subjectName, { fontSize: 18, color: colors.text }]}>{cls.subject}</Text>
+
                   <View style={[styles.metaRow, { marginTop: 8 }]}>
-                    <MapPin size={14} color="#8E8E93" />
-                    <Text style={styles.metaText}>{cls.room}</Text>
+                    <MapPin size={14} color={colors.textSecondary} />
+                    <Text style={[styles.metaText, { color: colors.textSecondary }]}>{cls.room}</Text>
                   </View>
-                  
+
                   <View style={styles.metaRow}>
-                    <Tag size={14} color="#8E8E93" />
-                    <Text style={styles.metaText}>{cls.type}</Text>
+                    <Tag size={14} color={colors.textSecondary} />
+                    <Text style={[styles.metaText, { color: colors.textSecondary }]}>{cls.type}</Text>
                   </View>
                 </View>
               </View>
@@ -131,7 +199,7 @@ export default function TimetableScreen() {
           })
         ) : (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No classes scheduled for {activeDay}.</Text>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No classes scheduled for {activeDay}.</Text>
           </View>
         )}
       </ScrollView>
@@ -193,16 +261,44 @@ const styles = StyleSheet.create({
   makeupSection: {
     marginBottom: 20,
   },
-  makeupCard: {
-    borderWidth: 1,
-    borderColor: '#FFD60A',
-    backgroundColor: '#FFFBE6',
+  makeupGridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  makeupGridCard: {
+    width: (Dimensions.get('window').width - 52) / 2,
+    flexDirection: 'column',
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: '#FF9500',
+    borderRadius: 16,
+    marginBottom: 12,
+  },
+  makeupSingleCard: {
+    borderWidth: 1.5,
+    borderColor: '#FF9500',
+  },
+  makeupBadge: {
+    backgroundColor: '#FF9500',
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 8,
+    gap: 4,
+  },
+  makeupBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   makeupDate: {
-    fontSize: 14,
-    color: '#FF9500',
+    fontSize: 13,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   classCard: {
     flexDirection: 'row',

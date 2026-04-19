@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import { useScraper } from '../../context/ScraperContext';
 import { CheckCircle, AlertTriangle, XCircle, Calculator, Plus, Minus } from 'lucide-react-native';
+import { useTheme } from '../../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
 export default function AttendanceScreen() {
   const { data, isScraping } = useScraper();
+  const { colors, isDark } = useTheme();
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [targetPct, setTargetPct] = useState(75);
 
@@ -45,28 +47,28 @@ export default function AttendanceScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Attendance Tracker</Text>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: 100 }}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <Text style={[styles.title, { color: colors.text }]}>Attendance Tracker</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={styles.subtitle}>Overall: {rawOverallAttendance}%</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Overall: {rawOverallAttendance}%</Text>
           {isScraping && (
-            <Text style={[styles.subtitle, { color: '#007AFF', marginLeft: 10, fontWeight: 'bold' }]}>
+            <Text style={[styles.subtitle, { color: colors.primary, marginLeft: 10, fontWeight: 'bold' }]}>
               • Syncing...
             </Text>
           )}
         </View>
 
         {/* Target attendance adjuster */}
-        <View style={styles.targetRow}>
-          <Text style={styles.targetLabel}>Target Attendance</Text>
-          <View style={styles.targetControls}>
-            <TouchableOpacity onPress={() => changeTarget(-5)} style={styles.targetBtn}>
-              <Minus size={16} color="#007AFF" />
+        <View style={[styles.targetRow, { borderTopColor: colors.border }]}>
+          <Text style={[styles.targetLabel, { color: colors.text }]}>Target Attendance</Text>
+          <View style={[styles.targetControls, { backgroundColor: colors.surface }]}>
+            <TouchableOpacity onPress={() => changeTarget(-5)} style={[styles.targetBtn, { backgroundColor: colors.card }]}>
+              <Minus size={16} color={colors.primary} />
             </TouchableOpacity>
-            <Text style={styles.targetValue}>{targetPct}%</Text>
-            <TouchableOpacity onPress={() => changeTarget(5)} style={styles.targetBtn}>
-              <Plus size={16} color="#007AFF" />
+            <Text style={[styles.targetValue, { color: colors.primary }]}>{targetPct}%</Text>
+            <TouchableOpacity onPress={() => changeTarget(5)} style={[styles.targetBtn, { backgroundColor: colors.card }]}>
+              <Plus size={16} color={colors.primary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -80,51 +82,51 @@ export default function AttendanceScreen() {
           return (
             <TouchableOpacity 
               key={index} 
-              style={[styles.card, isSelected && styles.cardSelected]}
+              style={[styles.card, { backgroundColor: colors.card, borderColor: isSelected ? colors.primary : 'transparent' }]}
               onPress={() => setSelectedSubject(isSelected ? null : item.subjectCode)}
               activeOpacity={0.7}
             >
               <View style={styles.cardHeader}>
                 <View style={styles.cardInfo}>
-                  <Text style={styles.subjectCode}>{item.subjectCode}</Text>
-                  <Text style={styles.subjectName}>{item.subjectName}</Text>
+                  <Text style={[styles.subjectCode, { color: colors.textSecondary }]}>{item.subjectCode}</Text>
+                  <Text style={[styles.subjectName, { color: colors.text }]}>{item.subjectName}</Text>
                 </View>
                 <View style={[styles.percentageBadge, { backgroundColor: `${status.color}15` }]}>
                   <Text style={[styles.percentageText, { color: status.color }]}>{item.percentage}%</Text>
                 </View>
               </View>
 
-              <View style={styles.statsRow}>
+              <View style={[styles.statsRow, { backgroundColor: colors.surface }]}>
                 <View style={styles.stat}>
-                  <Text style={styles.statLabel}>Attended</Text>
-                  <Text style={styles.statValue}>{item.attendedClasses}</Text>
+                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Attended</Text>
+                  <Text style={[styles.statValue, { color: colors.text }]}>{item.attendedClasses}</Text>
                 </View>
                 <View style={styles.stat}>
-                  <Text style={styles.statLabel}>Total</Text>
-                  <Text style={styles.statValue}>{item.totalClasses}</Text>
+                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Total</Text>
+                  <Text style={[styles.statValue, { color: colors.text }]}>{item.totalClasses}</Text>
                 </View>
                 <View style={styles.stat}>
-                  <Text style={styles.statLabel}>Leaves</Text>
-                  <Text style={styles.statValue}>{item.dutyLeaves || 0}</Text>
+                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Leaves</Text>
+                  <Text style={[styles.statValue, { color: colors.text }]}>{item.dutyLeaves || 0}</Text>
                 </View>
-                <View style={styles.statStatus}>
+                <View style={[styles.statStatus, { backgroundColor: colors.card }]}>
                   {status.icon}
                   <Text style={[styles.statusText, { color: status.color }]}>{status.text}</Text>
                 </View>
               </View>
 
               {isSelected && (
-                <View style={styles.calculatorBox}>
+                <View style={[styles.calculatorBox, { borderTopColor: colors.border }]}>
                   <View style={styles.calcHeader}>
-                    <Calculator size={18} color="#007AFF" />
-                    <Text style={styles.calcTitle}>Attendance Calculator (Inc. Leaves)</Text>
+                    <Calculator size={18} color={colors.primary} />
+                    <Text style={[styles.calcTitle, { color: colors.primary }]}>Attendance Calculator (Inc. Leaves)</Text>
                   </View>
-                  <Text style={styles.calcResult}>
+                  <Text style={[styles.calcResult, { color: colors.text }]}>
                     {calculateMissable(item.attendedClasses, item.totalClasses, item.dutyLeaves)}
                   </Text>
-                  <View style={styles.divider} />
-                  <Text style={styles.calcSubtitle}>If you skip 1 class today:</Text>
-                  <Text style={styles.calcImpact}>
+                  <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                  <Text style={[styles.calcSubtitle, { color: colors.textSecondary }]}>If you skip 1 class today:</Text>
+                  <Text style={[styles.calcImpact, { color: colors.error }]}>
                     New Percentage: {Math.ceil(((item.attendedClasses + (item.dutyLeaves || 0)) / (item.totalClasses + 1)) * 100)}%
                   </Text>
                 </View>
@@ -134,10 +136,10 @@ export default function AttendanceScreen() {
         })}
 
         {/* Aggregate Summary Section at the Bottom */}
-        <Text style={[styles.sectionTitle, { marginTop: 30, marginBottom: 10 }]}>Summary Report</Text>
-        <View style={styles.aggregateCard}>
-          <Text style={styles.aggregateTitle}>Aggregate Attendance Details</Text>
-          <View style={styles.aggregateDivider} />
+        <Text style={[styles.sectionTitle, { marginTop: 30, marginBottom: 10, color: colors.text }]}>Summary Report</Text>
+        <View style={[styles.aggregateCard, { backgroundColor: isDark ? colors.card : '#1C1C1E', borderColor: colors.border, borderWidth: isDark ? 1 : 0 }]}>
+          <Text style={[styles.aggregateTitle, { color: '#fff' }]}>Aggregate Attendance Details</Text>
+          <View style={[styles.aggregateDivider, { backgroundColor: 'rgba(255,255,255,0.1)' }]} />
           <View style={styles.aggregateRow}>
             <View style={styles.aggregateStat}>
               <Text style={styles.aggregateLabel}>Total</Text>

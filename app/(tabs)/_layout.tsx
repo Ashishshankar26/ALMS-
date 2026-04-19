@@ -8,12 +8,12 @@ import { useAuth } from '../../context/AuthContext';
 import { registerForPushNotificationsAsync } from '../../utils/notifications';
 
 import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
   const { isAuthenticated, loading } = useAuth();
+  const { colors, isDark } = useTheme();
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -23,7 +23,7 @@ export default function TabLayout() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: isDark ? '#000' : '#fff' }}>
         <ActivityIndicator size="large" color="#007bff" />
       </View>
     );
@@ -36,8 +36,8 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: '#8E8E93',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textSecondary,
         headerShown: false,
         tabBarLabelStyle: {
           fontSize: 10,
@@ -51,7 +51,7 @@ export default function TabLayout() {
           right: 20,
           height: 65,
           borderRadius: 30,
-          backgroundColor: '#fff',
+          backgroundColor: colors.card,
           borderTopWidth: 0,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: 10 },
@@ -59,6 +59,7 @@ export default function TabLayout() {
           shadowRadius: 15,
           elevation: 10,
           paddingBottom: Platform.OS === 'ios' ? 20 : 0,
+          borderTopColor: 'transparent',
         },
       }}>
       <Tabs.Screen

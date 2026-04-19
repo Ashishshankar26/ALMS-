@@ -1,11 +1,13 @@
 import React, { useRef, useState } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 import { WebView } from 'react-native-webview';
 import { useAuth } from '../context/AuthContext';
 import { router } from 'expo-router';
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const { colors, isDark } = useTheme();
   const webViewRef = useRef<WebView>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -44,10 +46,10 @@ export default function LoginScreen() {
   const spoofedUserAgent = "Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36";
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerText}>LPU UMS Login</Text>
-        <Text style={styles.subText}>Please log in to sync your data.</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <Text style={[styles.headerText, { color: colors.text }]}>LPU UMS Login</Text>
+        <Text style={[styles.subText, { color: colors.textSecondary }]}>Please log in to sync your data.</Text>
       </View>
 
       <WebView

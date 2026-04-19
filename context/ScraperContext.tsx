@@ -42,15 +42,6 @@ type ScraperContextType = {
   dumpHtml: () => void;
 };
 
-const ScraperContext = createContext<ScraperContextType>({
-  data: MOCK_DATA,
-  isScraping: false,
-  refreshData: () => {},
-  dumpHtml: () => {},
-});
-
-export const useScraper = () => useContext(ScraperContext);
-
 const MOCK_DATA: ScrapedData = {
   profile: {
     name: 'Loading...',
@@ -61,28 +52,7 @@ const MOCK_DATA: ScrapedData = {
   },
   timetable: {},
   attendance: [],
-  results: [
-    {
-      semester: 'Semester 1',
-      sgpa: '8.45',
-      cgpa: '8.45',
-      subjects: [
-        { code: 'MTH165', name: 'Mathematics I', grade: 'A', status: 'Pass' },
-        { code: 'PHY101', name: 'Physics', grade: 'A+', status: 'Pass' },
-        { code: 'CSE101', name: 'Introduction to Programming', grade: 'O', status: 'Pass' },
-      ]
-    },
-    {
-      semester: 'Semester 2',
-      sgpa: '7.66',
-      cgpa: '8.05',
-      subjects: [
-        { code: 'CSE202', name: 'Object Oriented Programming', grade: 'B+', status: 'Pass' },
-        { code: 'MTH166', name: 'Mathematics II', grade: 'A', status: 'Pass' },
-        { code: 'ECE101', name: 'Basic Electronics', grade: 'A', status: 'Pass' },
-      ]
-    }
-  ],
+  results: [],
   announcements: [],
   messages: [],
   assignments: [],
@@ -91,6 +61,15 @@ const MOCK_DATA: ScrapedData = {
   fee: '--',
   examUrl: '',
 };
+
+const ScraperContext = createContext<ScraperContextType>({
+  data: MOCK_DATA,
+  isScraping: false,
+  refreshData: () => {},
+  dumpHtml: () => {},
+});
+
+export const useScraper = () => useContext(ScraperContext);
 
 // ─── Scripts (each handles ONE page, no routing logic) ───────────────────────
 
@@ -116,6 +95,7 @@ const DASHBOARD_SCRIPT = `
 
       if ((hasCoursesLoaded && hasCgpa && hasAtt) || pollCount >= 20) {
         clearInterval(poll);
+        log("Dashboard: Poll done, starting scrapeAll");
         scrapeAll();
       }
     }, 500);
@@ -318,11 +298,33 @@ const DASHBOARD_SCRIPT = `
                 id: Math.random().toString(), 
                 courseCode: code, 
                 type: detail.replace(/Course\\s*:\\s*/i, "").trim(), 
-                lastDate: ldM ? ldM[1] : "Check UMS" 
+                lastDate: ldM ? ldM[1] : ""
               });
             }
           }
         }
+        
+        var makeupLink = "";
+        var examUrl = "";
+        var links = document.querySelectorAll("a");
+        for(var i=0; i<links.length; i++) {
+          if(links[i].href.includes("Student-MakeupAdjustment")) {
+            makeupLink = links[i].href;
+          }
+          if(links[i].href.includes("seatingplan")) {
+            examUrl = links[i].href;
+          }
+        }
+
+        var res = {
+          profile: prof,
+          cgpa: qC,
+          overallAttendance: qA,
+          fee: fV,
+          attendance: att,
+          assignments: assignments,
+          makeupUrl: makeupLink
+        };
 
         var msgs = [];
         var mmEl = document.getElementById("MyMessage");
@@ -361,12 +363,117 @@ const DASHBOARD_SCRIPT = `
           type: "DASHBOARD_DATA",
           payload: { 
             profile: prof, overallAttendance: qA, cgpa: qC, fee: fV, 
-            attendance: att, messages: msgs, assignments: assignments, announcements: announc 
+            attendance: att, messages: msgs, assignments: assignments, announcements: announc,
+            makeupUrl: makeupLink,
+            examUrl: examUrl
           }
         }));
+
+        // Now scrape results from modal
+        setTimeout(scrapeResults, 1000);
+
       } catch(errFin) {
         log("finalize Error: " + errFin.toString());
       }
+    }
+
+    function scrapeResults() {
+      log("scrapeResults: Starting...");
+      var cgpaBox = document.getElementById("cgpa");
+      if (!cgpaBox) { log("scrapeResults: CGPA box not found"); return; }
+      
+      cgpaBox.click();
+      log("scrapeResults: Clicked CGPA box");
+      
+      var rAttempts = 0;
+      var rPoll = setInterval(function() {
+        rAttempts++;
+        var modal = document.getElementById("modalmarks");
+        var gradeTab = document.getElementById("second-tab1");
+        var gradeContent = document.getElementById("GradeDetails");
+        
+        // Wait for modal and some content in GradeDetails (which is filled via AJAX)
+        if (modal && gradeContent && (gradeContent.innerHTML.length > 50 || rAttempts >= 30)) {
+          clearInterval(rPoll);
+          if (rAttempts >= 30) { 
+            log("scrapeResults: Timeout waiting for modal content"); 
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: "RESULTS_DATA", payload: [] }));
+            return; 
+          }
+          
+          // Switch to Grade Details tab if not active
+          if (gradeTab && !gradeTab.classList.contains("active")) {
+            gradeTab.click();
+            log("scrapeResults: Switched to Grade Details tab");
+          }
+          
+          setTimeout(function() {
+            try {
+              var results = [];
+              var allText = gradeContent.innerText || "";
+              log("scrapeResults: allText length=" + allText.length + " sample=" + allText.substring(0, 100));
+              var tables = gradeContent.querySelectorAll("table");
+              
+              // Find all matches for "Term" and "TGPA" separately and pair them
+              var termMatches = [];
+              
+              var tRegex = /Term\\s*[:\\s]*([IVX\\d]+)/gi;
+              var gRegex = /TGPA\\s*[:\\s]*([0-9.]+)/gi;
+              
+              var tList = [];
+              var m1;
+              while ((m1 = tRegex.exec(allText)) !== null) tList.push(m1[1]);
+              
+              var gList = [];
+              var m2;
+              while ((m2 = gRegex.exec(allText)) !== null) gList.push(m2[1]);
+              
+              for (var i = 0; i < tList.length; i++) {
+                termMatches.push({ term: tList[i], tgpa: gList[i] || "--" });
+              }
+              log("scrapeResults: termMatches found=" + termMatches.length);
+              
+              tables.forEach(function(table, idx) {
+                var termInfo = termMatches[idx] || { term: (idx+1).toString(), tgpa: "--" };
+                var subjects = [];
+                var rows = table.querySelectorAll("tr");
+                rows.forEach(function(row) {
+                  var rowText = row.innerText.trim();
+                  if (rowText && !rowText.includes("Course") && rowText.includes("::")) {
+                    // Looser regex: look for CODE, then Name after ::, then Grade after "Grade"
+                    var codeMatch = rowText.match(/([A-Z0-9]{3,})/); // At least 3 chars for code
+                    var nameMatch = rowText.match(/::\\s*([\\s\\S]+?)(?=\\s*Grade|$)/i);
+                    var gradeMatch = rowText.match(/Grade\\s*[:\\s]*([A-Z+O]{1,2})/i);
+                    
+                    if (codeMatch && nameMatch) {
+                      subjects.push({
+                        code: codeMatch[1].trim(),
+                        name: nameMatch[1].trim(),
+                        grade: gradeMatch ? gradeMatch[1].trim() : "--",
+                        credits: "4"
+                      });
+                    }
+                  }
+                });
+                results.push({
+                  semester: "Semester " + termInfo.term,
+                  sgpa: termInfo.tgpa,
+                  subjects: subjects
+                });
+              });
+              
+              log("scrapeResults: Done. Semesters=" + results.length);
+              window.ReactNativeWebView.postMessage(JSON.stringify({ type: "RESULTS_DATA", payload: results }));
+              
+              // Close modal after a delay
+              setTimeout(function() {
+                var closeBtn = modal.querySelector("button[data-dismiss='modal']");
+                if (closeBtn) closeBtn.click();
+              }, 1000);
+            } catch(e) { log("scrapeResults Parse Error: " + e.toString()); }
+          }, 2500);
+        }
+      }, 500);
     }
   } catch(e) {
     window.ReactNativeWebView.postMessage(JSON.stringify({ type: "ERROR", message: "Dashboard: " + e.toString() }));
@@ -491,6 +598,170 @@ const TIMETABLE_SCRIPT = `
 `;
 
 
+const MAKEUP_SCRIPT = `
+(function() {
+  try {
+    var log = function(msg) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'DEBUG', message: msg }));
+    };
+    log('Makeup: Polling for table...');
+    var m_attempts = 0;
+    var m_poll = setInterval(function() {
+      m_attempts++;
+      var tables = document.querySelectorAll('table');
+      var table = null;
+      for (var i = 0; i < tables.length; i++) {
+        if (tables[i].textContent.includes('Scheduled Date')) {
+          table = tables[i];
+          break;
+        }
+      }
+      
+      if (table || m_attempts >= 20) {
+        clearInterval(m_poll);
+        if (!table) {
+           log('Makeup: Table not found (Scheduled Date header missing)');
+           window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAKEUP_DATA', payload: [] }));
+           return;
+        }
+        
+        var rows = Array.from(table.querySelectorAll('tr')).filter(function(r) {
+           // Only rows with cells that aren't the header
+           return r.querySelectorAll('td').length >= 8 && !r.textContent.includes('Scheduled Date');
+        });
+        var data = rows.map(function(row, rIdx) {
+          var cells = row.querySelectorAll('td');
+          
+          if (rIdx === 0) {
+            var cellLogs = [];
+            for(var i=0; i<cells.length; i++) cellLogs.push(i + ': ' + cells[i].textContent.trim());
+            log('Makeup Row 0: ' + cellLogs.join(' | '));
+          }
+          
+          var categoryText = (cells[0].textContent || '').trim();
+          var dateText = (cells[1].textContent || '').trim();
+          var timeText = (cells[2].textContent || '').trim();
+          var roomText = (cells[3].querySelector('span') || cells[3]).textContent.trim();
+          var courseText = (cells[6].textContent || '').trim();
+          var typeText = (cells[7].textContent || '').trim();
+          var facultyText = (cells[8].textContent || '').trim();
+          
+          var courseCode = courseText.split(':')[0] || '';
+          var courseTitle = courseText.split(':')[1] || courseText;
+          
+          // Calculate day name from dateText (e.g. "25 Apr 2026")
+          var dayName = '';
+          try {
+            var d = new Date(dateText);
+            if (isNaN(d.getTime())) {
+              var parts = dateText.split(' ');
+              if (parts.length === 3) {
+                d = new Date(parts[1] + ' ' + parts[0] + ', ' + parts[2]);
+              }
+            }
+            var days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            dayName = days[d.getDay()] || '';
+          } catch(e) {
+            log('Day Calc Error: ' + e.toString());
+          }
+          
+          return {
+            date: dateText,
+            time: timeText,
+            room: roomText,
+            subjectCode: courseCode,
+            subject: courseTitle,
+            type: typeText,
+            faculty: facultyText,
+            category: categoryText,
+            dayName: dayName
+          };
+        }).filter(Boolean);
+        
+        log('Makeup: Found ' + data.length + ' rows');
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAKEUP_DATA', payload: data }));
+      }
+    }, 1000);
+  } catch(e) {
+    window.ReactNativeWebView.postMessage(JSON.stringify({ type: "ERROR", message: "Makeup: " + e.toString() }));
+  }
+})(); true;
+`;
+
+
+const EXAMS_SCRIPT = `
+(function() {
+  try {
+    var log = function(msg) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'DEBUG', message: msg }));
+    };
+    log('Exams: Polling for seating plan...');
+    var e_attempts = 0;
+    var e_poll = setInterval(function() {
+      e_attempts++;
+      var tables = document.querySelectorAll('table');
+      var table = null;
+      for (var i = 0; i < tables.length; i++) {
+        var txt = tables[i].textContent;
+        if (txt.includes('Date') && (txt.includes('Course') || txt.includes('Subject')) && txt.includes('Seat')) {
+          table = tables[i];
+          break;
+        }
+      }
+      
+      if (table || e_attempts >= 20) {
+        clearInterval(e_poll);
+        if (!table) {
+           log('Exams: Table not found');
+           window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'EXAMS_DATA', payload: [] }));
+           return;
+        }
+        
+        var rows = Array.from(table.querySelectorAll('tr')).filter(function(r) {
+           return r.querySelectorAll('td').length >= 4 && !r.textContent.includes('Date');
+        });
+        
+        var data = rows.map(function(row, rIdx) {
+          var cells = row.querySelectorAll('td');
+          
+          if (rIdx === 0) {
+            var cellLogs = [];
+            for(var i=0; i<cells.length; i++) cellLogs.push(i + ': ' + cells[i].textContent.trim());
+            log('Exams Row 0: ' + cellLogs.join(' | '));
+          }
+          
+          // Flexible mapping based on common LPU layouts
+          // Column 0: Exam Date, 1: Time/Session, 2: Course, 3: Room, 4: Seat...
+          var dateText = (cells[0].textContent || '').trim();
+          var timeText = (cells[1].textContent || '').trim();
+          var courseText = (cells[2].textContent || '').trim();
+          var roomText = (cells[3].textContent || '').trim();
+          var seatText = cells[4] ? (cells[4].textContent || '').trim() : '';
+          
+          var courseCode = courseText.split(':')[0] || courseText.split('-')[0] || '';
+          var courseTitle = courseText.includes(':') ? courseText.split(':')[1] : (courseText.includes('-') ? courseText.split('-')[1] : courseText);
+
+          return {
+            date: dateText,
+            time: timeText,
+            subjectCode: courseCode.trim(),
+            subject: courseTitle.trim(),
+            room: roomText,
+            seat: seatText
+          };
+        }).filter(Boolean);
+        
+        log('Exams: Found ' + data.length + ' exams');
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'EXAMS_DATA', payload: data }));
+      }
+    }, 1000);
+  } catch(e) {
+    window.ReactNativeWebView.postMessage(JSON.stringify({ type: "ERROR", message: "Exams: " + e.toString() }));
+  }
+})(); true;
+`;
+
+
 const RESULTS_SCRIPT = `
 (function() {
   try {
@@ -543,6 +814,7 @@ export const ScraperProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const webViewRef = useRef<WebView>(null);
   const didDashboard = useRef(false);
   const didTimetable = useRef(false);
+  const didMakeup = useRef(false);
 
   // Load initial data from storage
   useEffect(() => {
@@ -566,6 +838,7 @@ export const ScraperProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setIsScraping(false);
       didDashboard.current = false;
       didTimetable.current = false;
+      didMakeup.current = false;
     }
   }, [isAuthenticated]);
 
@@ -578,6 +851,7 @@ export const ScraperProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (isAuthenticated) {
       didDashboard.current = false;
       didTimetable.current = false;
+      didMakeup.current = false;
       isProcessingPhase.current = false;
       isFullyDone.current = false;
       // We keep the old data visible while syncing to prevent a "blank" screen
@@ -633,6 +907,13 @@ export const ScraperProvider: React.FC<{ children: React.ReactNode }> = ({ child
       didTimetable.current = true;
       isProcessingPhase.current = true;
       webViewRef.current?.injectJavaScript(TIMETABLE_SCRIPT);
+    } else if (url.includes('seatingplan') || url.includes('seating-plan')) {
+      console.log('INJECTING EXAMS_SCRIPT...');
+      webViewRef.current?.injectJavaScript(EXAMS_SCRIPT);
+    } else if (url.includes('Student-MakeupAdjustment') && !didMakeup.current) {
+      console.log('INJECTING MAKEUP_SCRIPT...');
+      didMakeup.current = true;
+      webViewRef.current?.injectJavaScript(MAKEUP_SCRIPT);
     } else if (url.includes('Login.aspx') || url.includes('login.aspx') || url.includes('LoginNew.aspx') || url.includes('index.aspx')) {
       console.warn('SCRAPER: Redirected to Login! Session might be expired.');
       setIsScraping(false);
@@ -682,28 +963,56 @@ export const ScraperProvider: React.FC<{ children: React.ReactNode }> = ({ child
           if (p.fee) merged.fee = p.fee;
           if (p.examUrl) merged.examUrl = p.examUrl;
           
+          // Trigger Makeup Scraping if URL found
+          if (p.makeupUrl) {
+            webViewRef.current?.injectJavaScript(
+               "window.location.href = '" + p.makeupUrl + "'; true;"
+            );
+          } else {
+             // Go directly to timetable if no makeup
+             webViewRef.current?.injectJavaScript(
+                `window.location.href = 'https://ums.lpu.in/lpuums/Reports/frmStudentTimeTable.aspx'; true;`
+             );
+          }
+
+          merged.lastUpdated = new Date().toISOString();
           AsyncStorage.setItem('@scraped_data', JSON.stringify(merged)).catch(console.error);
           return merged;
         });
 
-        // Navigate to timetable (React side drives navigation, not the script)
+      } else if (msg.type === 'EXAMS_DATA') {
+        const payload = msg.payload || [];
+        console.log('EXAMS DATA RECEIVED:', JSON.stringify(payload));
+        setData(prev => {
+          const merged = { ...prev, ...msg.payload, lastUpdated: new Date().toISOString() };
+          AsyncStorage.setItem('@scraped_data', JSON.stringify(merged)).catch(console.error);
+          return merged;
+        });
+      } else if (msg.type === 'MAKEUP_DATA') {
+        const payload = msg.payload || [];
+        console.log('MAKEUP DATA RECEIVED:', JSON.stringify(payload));
+        setData(prev => {
+          const merged = { ...prev, makeupClasses: payload };
+          AsyncStorage.setItem('@scraped_data', JSON.stringify(merged)).catch(console.error);
+          return merged;
+        });
+
+        // NOW navigate to timetable (Final Step)
         webViewRef.current?.injectJavaScript(
           `window.location.href = 'https://ums.lpu.in/lpuums/Reports/frmStudentTimeTable.aspx'; true;`
         );
 
-      } else if (msg.type === 'TIMETABLE_HTML_BLOB') {
-        const html = msg.payload || '';
-        // Extract courses and schedule from the raw HTML blob using a background-friendly approach
-        // We'll use a simplified regex-based extractor for speed or reuse our logic
-        // For now, let's keep it simple: we already have the full TIMETABLE_JSON logic
-        // So we'll trigger the TIMETABLE_SCRIPT in the hidden webview if needed,
-        // OR we can just parse the blob here if we had a DOM parser.
-        // Since React Native doesn't have DOMParser, we'll rely on the existing chain
-        // but the 'DASHBOARD_DATA' already marks us as nearly done.
-        console.log('TIMETABLE BLOB received, length:', html.length);
+      } else if (msg.type === 'RESULTS_DATA') {
+        const payload = msg.payload || [];
+        setData(prev => {
+          const merged = { ...prev, results: payload };
+          AsyncStorage.setItem('@scraped_data', JSON.stringify(merged)).catch(console.error);
+          return merged;
+        });
 
       } else if (msg.type === 'TIMETABLE_JSON') {
         setIsScraping(false); // FINISH LOADING
+        isFullyDone.current = true;
         const raw = msg.payload || {};
         const rawSchedule = raw.schedule || {};
         const courses: any[] = raw.courses || [];
@@ -771,12 +1080,23 @@ export const ScraperProvider: React.FC<{ children: React.ReactNode }> = ({ child
             ...prev, 
             timetable: structuredSchedule,
             attendance: updatedAttendance,
-            overallAttendance: aggregatePct
+            overallAttendance: aggregatePct,
+            makeupClasses: prev.makeupClasses || [],
+            lastUpdated: new Date().toISOString()
           };
           AsyncStorage.setItem('@scraped_data', JSON.stringify(merged)).catch(console.error);
           return merged;
         });
 
+      } else if (msg.type === 'URL_CHANGE') {
+        const url = msg.payload;
+        if (url.includes('StudentDashboard.aspx')) {
+          webViewRef.current?.injectJavaScript(DASHBOARD_SCRIPT);
+        } else if (url.includes('frmStudentTimeTable.aspx')) {
+          webViewRef.current?.injectJavaScript(TIMETABLE_SCRIPT);
+        } else if (url.includes('Student-MakeupAdjustment')) {
+          webViewRef.current?.injectJavaScript(MAKEUP_SCRIPT);
+        }
       } else if (msg.type === 'DEBUG') {
         console.log('SCRAPER DEBUG:', msg.message);
       } else if (msg.type === 'ERROR') {

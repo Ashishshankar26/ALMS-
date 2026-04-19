@@ -2,44 +2,30 @@ import React, { useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import { useScraper } from '../../context/ScraperContext';
 import { ChevronDown, ChevronUp, GraduationCap } from 'lucide-react-native';
-
-const DUMMY_RESULTS = [
-  {
-    semester: 'Semester 1',
-    sgpa: '8.45',
-    cgpa: '8.45',
-    subjects: [
-      { code: 'MTH165', name: 'Mathematics I', grade: 'A', status: 'Pass' },
-      { code: 'PHY101', name: 'Physics', grade: 'A+', status: 'Pass' },
-      { code: 'CSE101', name: 'Introduction to Programming', grade: 'O', status: 'Pass' },
-    ]
-  },
-  {
-    semester: 'Semester 2',
-    sgpa: '7.66',
-    cgpa: '8.05',
-    subjects: [
-      { code: 'CSE202', name: 'Object Oriented Programming', grade: 'B+', status: 'Pass' },
-      { code: 'MTH166', name: 'Mathematics II', grade: 'A', status: 'Pass' },
-      { code: 'ECE101', name: 'Basic Electronics', grade: 'A', status: 'Pass' },
-    ]
-  }
-];
+import { useTheme } from '../../context/ThemeContext';
 
 export default function ResultsScreen() {
   const { data } = useScraper();
-  const resultsData = (data.results && data.results.length > 0) ? data.results : DUMMY_RESULTS;
+  const { colors, isDark } = useTheme();
+  const resultsData = (data.results && data.results.length > 0) ? data.results : [];
   const [expandedSem, setExpandedSem] = useState<string | null>(resultsData[0]?.semester || null);
 
+  if (resultsData.length === 0) {
+    return (
+      <View style={[styles.emptyContainer, { backgroundColor: colors.background }]}>
+        <GraduationCap size={64} color={colors.textSecondary} />
+        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No results found yet.</Text>
+        <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>Sync your data from the home screen to see your semester-wise grades.</Text>
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Academic Results</Text>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: 100 }}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <Text style={[styles.title, { color: colors.text }]}>Academic Results</Text>
         <View style={styles.subtitleRow}>
-          <Text style={styles.subtitle}>Current CGPA: {data.cgpa || '--'}</Text>
-          <View style={styles.comingSoonBadge}>
-            <Text style={styles.comingSoonText}>Coming Soon</Text>
-          </View>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Current CGPA: {data.cgpa || '--'}</Text>
         </View>
       </View>
 
@@ -48,31 +34,31 @@ export default function ResultsScreen() {
           const isExpanded = expandedSem === sem.semester;
 
           return (
-            <View key={index} style={styles.card}>
+            <View key={index} style={[styles.card, { backgroundColor: colors.card }]}>
               <TouchableOpacity 
                 style={styles.cardHeader}
                 onPress={() => setExpandedSem(isExpanded ? null : sem.semester)}
                 activeOpacity={0.7}
               >
                 <View style={styles.semInfo}>
-                  <Text style={styles.semTitle}>{sem.semester}</Text>
-                  <View style={styles.sgpaBadge}>
-                    <Text style={styles.sgpaText}>SGPA: {sem.sgpa}</Text>
+                  <Text style={[styles.semTitle, { color: colors.text }]}>{sem.semester}</Text>
+                  <View style={[styles.sgpaBadge, { backgroundColor: isDark ? 'rgba(255,149,0,0.1)' : '#FFF2E5' }]}>
+                    <Text style={[styles.sgpaText, { color: colors.warning }]}>TGPA: {sem.sgpa}</Text>
                   </View>
                 </View>
-                {isExpanded ? <ChevronUp color="#8E8E93" /> : <ChevronDown color="#8E8E93" />}
+                {isExpanded ? <ChevronUp color={colors.textSecondary} /> : <ChevronDown color={colors.textSecondary} />}
               </TouchableOpacity>
 
               {isExpanded && (
-                <View style={styles.expandedContent}>
+                <View style={[styles.expandedContent, { backgroundColor: isDark ? colors.surface : '#FAFAFA', borderTopColor: colors.border }]}>
                   {(sem.subjects || []).map((sub, subIndex) => (
-                    <View key={subIndex} style={styles.subjectRow}>
+                    <View key={subIndex} style={[styles.subjectRow, { borderBottomColor: colors.border }]}>
                       <View style={styles.subjectInfo}>
-                        <Text style={styles.subjectName}>{sub.name}</Text>
-                        <Text style={styles.creditsText}>{sub.credits} Credits</Text>
+                        <Text style={[styles.subjectName, { color: colors.text }]}>{sub.name}</Text>
+                        <Text style={[styles.creditsText, { color: colors.textSecondary }]}>{sub.code}</Text>
                       </View>
-                      <View style={styles.gradeBadge}>
-                        <Text style={styles.gradeText}>{sub.grade}</Text>
+                      <View style={[styles.gradeBadge, { backgroundColor: isDark ? 'rgba(10,132,255,0.15)' : '#E5F1FF' }]}>
+                        <Text style={[styles.gradeText, { color: colors.primary }]}>{sub.grade}</Text>
                       </View>
                     </View>
                   ))}
@@ -98,6 +84,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#C7C7CC',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    backgroundColor: '#F2F2F7',
+  },
+  emptyText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#8E8E93',
+    marginTop: 20,
+  },
+  emptySubtext: {
+    fontSize: 15,
+    color: '#8E8E93',
+    textAlign: 'center',
+    marginTop: 10,
+    lineHeight: 22,
   },
   title: {
     fontSize: 26,
