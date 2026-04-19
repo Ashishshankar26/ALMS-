@@ -229,6 +229,7 @@ const DASHBOARD_SCRIPT = `
 
         // Step 3: Finalize and Send
         function finalize(resList) {
+          log("SCRAPER DEBUG: finalize starting...");
           try {
             var prof = { name: "Unknown", vid: "", section: "", program: "", avatarUrl: "" };
             var nameEl = document.getElementById("p_name");
@@ -333,6 +334,27 @@ const DASHBOARD_SCRIPT = `
               }
             }
 
+            var messages = [];
+            var msgContainer = document.getElementById("PersonalMessages") || document.getElementById("MyMessages") || document.querySelector(".PersonalMessages") || document.querySelector(".MyMessages");
+            if (msgContainer) {
+              var msgRows = msgContainer.querySelectorAll(".row, .mycoursesdiv, li");
+              for (var i = 0; i < msgRows.length; i++) {
+                var row = msgRows[i];
+                var subjEl = row.querySelector(".announcement-subject") || row.querySelector("b") || row.querySelector("strong");
+                var dateEl = row.querySelector(".announcement-date") || row.querySelector("span.text-muted") || row.querySelector(".date");
+                var contEl = row.querySelector(".announcement-content") || row.querySelector("p") || row.querySelector(".message-body");
+                if (subjEl) {
+                  messages.push({ 
+                    id: Math.random().toString(), 
+                    title: subjEl.innerText.trim(), 
+                    content: contEl ? contEl.innerText.trim() : subjEl.innerText.trim(), 
+                    date: dateEl ? dateEl.innerText.trim() : "Today" 
+                  });
+                }
+              }
+            }
+            log("SCRAPER DEBUG: Found " + messages.length + " personal messages");
+
             var mkLink = "";
             var links = document.querySelectorAll("a");
             for(var i=0; i<links.length; i++) {
@@ -344,6 +366,7 @@ const DASHBOARD_SCRIPT = `
               payload: { 
                 profile: prof, overallAttendance: qA, cgpa: qC, fee: fV, 
                 attendance: att, assignments: assignments, announcements: announc,
+                messages: messages,
                 makeupUrl: mkLink, results: resList || []
               }
             }));
@@ -662,11 +685,11 @@ const RESULTS_SCRIPT = `
              rows.forEach(function(row) {
                 var cells = row.querySelectorAll('td');
                 if (cells.length > 5) {
-                   results.push({
+                    results.push({
                       code: cells[1].innerText.trim(),
                       name: cells[2].innerText.trim(),
                       grade: cells[4].innerText.trim()
-                   });
+                    });
                 }
              });
              log('Results: Extracted ' + results.length + ' rows');
