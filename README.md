@@ -1,4 +1,4 @@
-# ALMS - As Learning Management System 🚀
+# ALMS - Ashish Learning Management System 🚀
 
 **Take control of your academic life at Lovely Professional University with ALMS.**
 
