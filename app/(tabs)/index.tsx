@@ -462,7 +462,7 @@ export default function DashboardScreen() {
                 {updateAvailable ? 'New Update Ready! 🚀' : 'App is up to date'}
               </Text>
               <Text style={[styles.updateSub, { color: colors.textSecondary, textAlign: 'center' }]}>
-                {updateAvailable ? 'Restart to apply fixes' : 'Download ALMS'}
+                {updateAvailable ? 'Restart to apply fixes' : 'Check GitHub for releases'}
               </Text>
             </View>
           </View>

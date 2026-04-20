@@ -1,4 +1,6 @@
-# ALMS - Ashish Learning Management System 🚀
+# ALMS - Academic Learning Management System 🚀
+
+### 📥 [**Download ALMS (Latest APK)**](https://github.com/Ashishshankar26/ALMS/releases)
 
 **Take control of your academic life at Lovely Professional University with ALMS.**
 
@@ -19,6 +21,9 @@ ALMS is a premium, native mobile application designed by a student, for students
 ### 🏆 **Academic Overview**
 - Check your current CGPA and SGPA in a clean, readable format.
 
+### 💬 **Restored Messages**
+- Access your university notifications and personal messages in a native chat-like interface.
+
 ### 💡 **Special Feature: Integrated Leave Management**
 - **One-Page Leave**: Apply for leave and view your leave slips side-by-side in one integrated page.
 - **No Browser Needed**: Complete the entire leave process within the app without ever opening an external web browser.
@@ -36,19 +41,10 @@ ALMS is a premium, native mobile application designed by a student, for students
 
 ---
 
-## 🛠 Coming Soon (In Development)
-
-We are working hard to bring even more features to ALMS:
-- **Detailed Results & CA Marks**: View your detailed subject marks and CA performance.
-- **Teacher on Leave**: Stay informed with real-time updates on faculty availability.
-- **Exam Seating Plan**: Quick access to your exam locations and conduct details.
-
----
-
 ## 📦 Installation
 
-1. Go to the [Releases](https://github.com/Ashishshankar26/ALMS-/releases) section.
-2. Download the **`ALMS.apk`**.
+1. Click on [**Download ALMS**](https://github.com/Ashishshankar26/ALMS/releases).
+2. Download the latest **`ALMS.apk`** from the assets section.
 3. Install and log in with your UMS credentials.
 4. *Note: If prompted, click "Install Anyway" (Standard for student-built APKs).*
 
