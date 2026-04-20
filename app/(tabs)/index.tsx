@@ -431,16 +431,16 @@ export default function DashboardScreen() {
             </View>
           )}
           {/* Update Manager */}
-        <View style={[styles.updateCard, { backgroundColor: isDark ? 'rgba(10,132,255,0.05)' : '#F0F7FF', borderColor: colors.primary + '30', flexDirection: 'column', alignItems: 'stretch' }]}>
-          <View style={[styles.updateInfo, { marginBottom: 15 }]}>
-            <View style={[styles.versionBadge, { backgroundColor: colors.primary }]}>
+        <View style={[styles.updateCard, { backgroundColor: isDark ? 'rgba(10,132,255,0.05)' : '#F0F7FF', borderColor: colors.primary + '30', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }]}>
+          <View style={[styles.updateInfo, { marginBottom: 15, flexDirection: 'column', alignItems: 'center' }]}>
+            <View style={[styles.versionBadge, { backgroundColor: colors.primary, marginBottom: 8 }]}>
               <Text style={styles.versionText}>v{version}</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.updateTitle, { color: colors.text }]}>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={[styles.updateTitle, { color: colors.text, textAlign: 'center' }]}>
                 {updateAvailable ? 'New Update Ready! 🚀' : 'App is up to date'}
               </Text>
-              <Text style={[styles.updateSub, { color: colors.textSecondary }]}>
+              <Text style={[styles.updateSub, { color: colors.textSecondary, textAlign: 'center' }]}>
                 {updateAvailable ? 'Restart to apply fixes' : 'Check GitHub for releases'}
               </Text>
             </View>
@@ -448,7 +448,7 @@ export default function DashboardScreen() {
           
           <TouchableOpacity 
             onPress={updateAvailable ? handleUpdate : openGitHub}
-            style={[styles.updateBtn, { backgroundColor: colors.primary, alignSelf: 'flex-start' }]}
+            style={[styles.updateBtn, { backgroundColor: colors.primary, alignSelf: 'center' }]}
           >
             <Text style={styles.updateBtnText}>
               {updateAvailable ? 'Update Now' : 'Check for Updates'}
