@@ -79,41 +79,36 @@ export default function ExamsScreen() {
           <WebView
             source={{ uri: currentExamsUrl }}
             userAgent="Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"
-            style={styles.webview}
+            style={[styles.webview]}
             onLoadEnd={() => setLoading(false)}
             sharedCookiesEnabled={true}
             thirdPartyCookiesEnabled={true}
-            domStorageEnabled={true}
-            javaScriptEnabled={true}
             injectedJavaScript={`
               (function() {
-                // Delayed injection to prevent interference with page load
-                setTimeout(function() {
-                  var style = document.createElement('style');
-                  style.innerHTML = ' \
-                    #Happeningleft, .lpu-naac, .header-wrapper, footer, .top-nav, .side-nav, .navbar, .sidebar, .header-nav, .main-header, .topbar, #header, #footer { \
-                      display: none !important; \
-                    } \
-                    .main-content, .wrapper { \
-                      margin-left: 0 !important; \
-                      padding-top: 0 !important; \
-                    } \
-                  ';
-                  document.head.appendChild(style);
-                }, 1000);
-                
-                if (document.body.innerText.includes('Login') && document.querySelectorAll('input[type="password"]').length > 0) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'SESSION_EXPIRED' }));
-                }
+                var s = document.createElement('style');
+                s.innerHTML = \`
+                  .header-wrapper, footer, .top-nav, .side-nav, .navbar, .sidebar, .header-nav, .main-header { 
+                    display: none !important; 
+                  }
+                  .page-content, .container-fluid, body, html, .main-content, .wrapper { 
+                    width: 100% !important; 
+                    padding: 0 !important; 
+                    margin: 0 !important;
+                  }
+                \`;
+                document.head.appendChild(s);
               })(); true;
             `}
+            onError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.warn('WebView error: ', nativeEvent);
+            }}
+            onHttpError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.warn('WebView HTTP error: ', nativeEvent);
+            }}
             onMessage={(event) => {
-              try {
-                const msg = JSON.parse(event.nativeEvent.data);
-                if (msg.type === 'SESSION_EXPIRED') {
-                  router.replace('/login');
-                }
-              } catch(e) {}
+              console.log('WebView message:', event.nativeEvent.data);
             }}
           />
         </>

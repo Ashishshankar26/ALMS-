@@ -880,6 +880,9 @@ export const ScraperProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const p = msg.payload || {};
         console.log('DASHBOARD DATA RECEIVED:', Object.keys(p));
         
+        // STOP blocking loading here so user can see dashboard immediately
+        setIsScraping(false);
+
         setData(prev => {
           const merged = { ...prev };
           if (p.profile?.name) {
@@ -898,13 +901,13 @@ export const ScraperProvider: React.FC<{ children: React.ReactNode }> = ({ child
           if (p.examUrl) merged.examUrl = p.examUrl;
           if (p.results?.length > 0) merged.results = p.results;
           
-          // Trigger Makeup Scraping if URL found
+          // Trigger Makeup Scraping if URL found (Continues in background)
           if (p.makeupUrl) {
             webViewRef.current?.injectJavaScript(
                "window.location.href = '" + p.makeupUrl + "'; true;"
             );
           } else {
-             // Go directly to timetable if no makeup
+             // Go directly to timetable if no makeup (Continues in background)
              webViewRef.current?.injectJavaScript(
                 `window.location.href = 'https://ums.lpu.in/lpuums/Reports/frmStudentTimeTable.aspx'; true;`
              );
