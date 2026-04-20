@@ -85,18 +85,37 @@ export default function ExamsScreen() {
             thirdPartyCookiesEnabled={true}
             injectedJavaScript={`
               (function() {
-                var s = document.createElement('style');
-                s.innerHTML = \`
-                  .header-wrapper, footer, .top-nav, .side-nav, .navbar, .sidebar, .header-nav, .main-header { 
-                    display: none !important; 
+                var applyStyles = function() {
+                  var s = document.getElementById('alms-injected-styles');
+                  if (!s) {
+                    s = document.createElement('style');
+                    s.id = 'alms-injected-styles';
+                    document.head.appendChild(s);
                   }
-                  .page-content, .container-fluid, body, html, .main-content, .wrapper { 
-                    width: 100% !important; 
-                    padding: 0 !important; 
-                    margin: 0 !important;
-                  }
-                \`;
-                document.head.appendChild(s);
+                  s.innerHTML = \`
+                    .header-wrapper, footer, .top-nav, .side-nav, .navbar, .sidebar, .header-nav, .main-header, #Happeningleft, .lpu-naac, .footer-wrapper { 
+                      display: none !important; 
+                    }
+                    .page-content, .container-fluid, body, html, .main-content, .wrapper, .content-wrapper { 
+                      width: 100% !important; 
+                      padding: 0 !important; 
+                      margin: 0 !important;
+                      overflow-x: hidden !important;
+                    }
+                    * { max-width: 100vw !important; }
+                  \`;
+                };
+
+                applyStyles();
+                
+                // Monitor for dynamic changes and re-apply
+                var observer = new MutationObserver(applyStyles);
+                observer.observe(document.body, { childList: true, subtree: true });
+                
+                // Also check for redirects to login
+                if (document.body.innerText.includes('Login') && document.querySelectorAll('input[type="password"]').length > 0) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'SESSION_EXPIRED' }));
+                }
               })(); true;
             `}
             onError={(syntheticEvent) => {
@@ -107,7 +126,20 @@ export default function ExamsScreen() {
               const { nativeEvent } = syntheticEvent;
               console.warn('WebView HTTP error: ', nativeEvent);
             }}
+            onNavigationStateChange={(navState) => {
+              console.log('WebView Nav State Change:', navState.url);
+              if (navState.url.includes('login') || navState.url.includes('Login')) {
+                console.warn('WebView Redirected to Login!');
+              }
+            }}
             onMessage={(event) => {
+              try {
+                const msg = JSON.parse(event.nativeEvent.data);
+                if (msg.type === 'SESSION_EXPIRED') {
+                  console.warn('Scraper detected session expiry on Exams portal');
+                  router.replace('/login');
+                }
+              } catch(e) {}
               console.log('WebView message:', event.nativeEvent.data);
             }}
           />
