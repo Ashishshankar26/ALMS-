@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, 
 import { WebView } from 'react-native-webview';
 import { router } from 'expo-router';
 import { ArrowLeft, Calendar, Clock, MapPin, User } from 'lucide-react-native';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { useScraper } from '../context/ScraperContext';
 import { useTheme } from '../context/ThemeContext';
 
@@ -15,6 +17,34 @@ export default function ExamsScreen() {
   const [showWebView, setShowWebView] = useState(false);
   const exams = data.exams || [];
   const currentExamsUrl = data.examUrl || EXAMS_URL;
+
+  const handleDownload = async (downloadUrl: string) => {
+    try {
+      setLoading(true);
+      const filename = 'LPU_Admit_Card_' + new Date().getTime() + '.pdf';
+      const fileUri = FileSystem.documentDirectory + filename;
+      
+      console.log('Downloading admit card from:', downloadUrl);
+      
+      const downloadRes = await FileSystem.downloadAsync(downloadUrl, fileUri);
+      
+      if (downloadRes.status === 200) {
+        console.log('Download complete:', downloadRes.uri);
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(downloadRes.uri);
+        } else {
+          alert('Sharing is not available on this device');
+        }
+      } else {
+        alert('Failed to download admit card. Status: ' + downloadRes.status);
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Error downloading admit card');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -125,6 +155,17 @@ export default function ExamsScreen() {
             onHttpError={(syntheticEvent) => {
               const { nativeEvent } = syntheticEvent;
               console.warn('WebView HTTP error: ', nativeEvent);
+            }}
+            onFileDownload={({ nativeEvent: { downloadUrl } }) => {
+              handleDownload(downloadUrl);
+            }}
+            onShouldStartLoadWithRequest={(request) => {
+              // Intercept PDF downloads
+              if (request.url.toLowerCase().endsWith('.pdf') || request.url.includes('Download') || request.url.includes('AdmitCard')) {
+                handleDownload(request.url);
+                return false;
+              }
+              return true;
             }}
             onNavigationStateChange={(navState) => {
               console.log('WebView Nav State Change:', navState.url);
