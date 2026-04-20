@@ -448,7 +448,7 @@ export default function DashboardScreen() {
           
           <TouchableOpacity 
             onPress={updateAvailable ? handleUpdate : openGitHub}
-            style={[styles.updateBtn, { backgroundColor: colors.primary, width: '100%' }]}
+            style={[styles.updateBtn, { backgroundColor: colors.primary, alignSelf: 'flex-start' }]}
           >
             <Text style={styles.updateBtnText}>
               {updateAvailable ? 'Update Now' : 'Check for Updates'}
