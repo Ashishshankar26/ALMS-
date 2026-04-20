@@ -1,4 +1,4 @@
-# ALMS - Academic Learning Management System 🚀
+# ALMS - Ashish Learning Management System 🚀
 
 ### 📥 [**Download ALMS (Latest APK)**](https://github.com/Ashishshankar26/ALMS/releases)
 
