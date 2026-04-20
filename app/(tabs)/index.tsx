@@ -168,13 +168,14 @@ export default function DashboardScreen() {
   })();
 
   const [showMessages, setShowMessages] = React.useState(false);
+  const [isUpdating, setIsUpdating] = React.useState(false);
   const [updateAvailable, setUpdateAvailable] = React.useState(false);
   const version = Constants.expoConfig?.version || '1.0.0';
 
   React.useEffect(() => {
     async function checkUpdates() {
-      if (__DEV__) return;
       try {
+        if (!Updates.isEnabled) return;
         const update = await Updates.checkForUpdateAsync();
         if (update.isAvailable) {
           setUpdateAvailable(true);
@@ -188,15 +189,35 @@ export default function DashboardScreen() {
 
   const handleUpdate = async () => {
     try {
+      setIsUpdating(true);
       await Updates.fetchUpdateAsync();
       await Updates.reloadAsync();
     } catch (e) {
       alert('Update failed. Please try again later.');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
-  const openGitHub = () => {
-    Linking.openURL('https://github.com/Ashishshankar26/ALMS/releases');
+  const forceUpdate = async () => {
+    try {
+      setIsUpdating(true);
+      if (!Updates.isEnabled) {
+        throw new Error('Updates not supported in this environment');
+      }
+      const update = await Updates.checkForUpdateAsync();
+      if (update.isAvailable) {
+        await Updates.fetchUpdateAsync();
+        await Updates.reloadAsync();
+      } else {
+        alert('You are already on the latest version!');
+      }
+    } catch (e) {
+      console.log('Force update failed:', e);
+      Linking.openURL('https://github.com/Ashishshankar26/ALMS/releases');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handleExamsPress = () => {
@@ -447,12 +468,17 @@ export default function DashboardScreen() {
           </View>
           
           <TouchableOpacity 
-            onPress={updateAvailable ? handleUpdate : openGitHub}
-            style={[styles.updateBtn, { backgroundColor: colors.primary, alignSelf: 'center' }]}
+            onPress={updateAvailable ? handleUpdate : forceUpdate}
+            style={[styles.updateBtn, { backgroundColor: colors.primary, alignSelf: 'center', opacity: isUpdating ? 0.7 : 1 }]}
+            disabled={isUpdating}
           >
-            <Text style={styles.updateBtnText}>
-              {updateAvailable ? 'Update Now' : 'Check for Updates'}
-            </Text>
+            {isUpdating ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.updateBtnText}>
+                {updateAvailable ? 'Update Now' : 'Check for Updates'}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
 
