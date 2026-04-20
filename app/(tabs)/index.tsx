@@ -431,16 +431,16 @@ export default function DashboardScreen() {
             </View>
           )}
           {/* Update Manager */}
-        <View style={[styles.updateCard, { backgroundColor: isDark ? 'rgba(10,132,255,0.05)' : '#F0F7FF', borderColor: colors.primary + '30' }]}>
-          <View style={[styles.updateInfo, { flex: 1, marginRight: 10 }]}>
+        <View style={[styles.updateCard, { backgroundColor: isDark ? 'rgba(10,132,255,0.05)' : '#F0F7FF', borderColor: colors.primary + '30', flexDirection: 'column', alignItems: 'stretch' }]}>
+          <View style={[styles.updateInfo, { marginBottom: 15 }]}>
             <View style={[styles.versionBadge, { backgroundColor: colors.primary }]}>
               <Text style={styles.versionText}>v{version}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.updateTitle, { color: colors.text }]} numberOfLines={1}>
+              <Text style={[styles.updateTitle, { color: colors.text }]}>
                 {updateAvailable ? 'New Update Ready! 🚀' : 'App is up to date'}
               </Text>
-              <Text style={[styles.updateSub, { color: colors.textSecondary }]} numberOfLines={1}>
+              <Text style={[styles.updateSub, { color: colors.textSecondary }]}>
                 {updateAvailable ? 'Restart to apply fixes' : 'Check GitHub for releases'}
               </Text>
             </View>
@@ -448,10 +448,10 @@ export default function DashboardScreen() {
           
           <TouchableOpacity 
             onPress={updateAvailable ? handleUpdate : openGitHub}
-            style={[styles.updateBtn, { backgroundColor: colors.primary }]}
+            style={[styles.updateBtn, { backgroundColor: colors.primary, width: '100%' }]}
           >
             <Text style={styles.updateBtnText}>
-              {updateAvailable ? 'Update Now' : 'Check Update'}
+              {updateAvailable ? 'Update Now' : 'Check for Updates'}
             </Text>
           </TouchableOpacity>
         </View>
