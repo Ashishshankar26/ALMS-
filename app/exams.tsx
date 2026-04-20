@@ -6,7 +6,7 @@ import { ArrowLeft, Calendar, Clock, MapPin, User } from 'lucide-react-native';
 import { useScraper } from '../context/ScraperContext';
 import { useTheme } from '../context/ThemeContext';
 
-const EXAMS_URL = 'https://studentums.lpu.in/dashboard/examination/conduct/seatingplan';
+const EXAMS_URL = 'https://studentums.lpu.in/dashboard/examination/conduct/seatingplan?token=e1832132a1cdb364325a027f9053b98aeb903fee43ae562924a167ca052aec55c2ffa8b58aef6601b4cf54c6674cabf570fef45885a38bf78b32007a3d40a8c5c9c70223136940245df090e86fe1e6c47f6b76c4366976cd672978092b8c8eb2';
 
 export default function ExamsScreen() {
   const { data } = useScraper();
@@ -14,7 +14,7 @@ export default function ExamsScreen() {
   const [loading, setLoading] = useState(true);
   const [showWebView, setShowWebView] = useState(false);
   const exams = data.exams || [];
-  const currentExamsUrl = data.examUrl || EXAMS_URL;
+  const currentExamsUrl = EXAMS_URL;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -87,10 +87,10 @@ export default function ExamsScreen() {
               (function() {
                 var s = document.createElement('style');
                 s.innerHTML = \`
-                  #Happeningleft, .lpu-naac, .header-wrapper, footer, .top-nav, .side-nav, #id_header, .footer-wrapper { 
+                  #Happeningleft, .lpu-naac, .header-wrapper, footer, .top-nav, .side-nav, #id_header, .footer-wrapper, .navbar, .sidebar, .header-nav, .main-header { 
                     display: none !important; 
                   }
-                  .form-info, .page-content, .container-fluid, body, html { 
+                  .form-info, .page-content, .container-fluid, body, html, .main-content, .wrapper { 
                     width: 100% !important; 
                     padding: 0 !important; 
                     margin: 0 !important;
